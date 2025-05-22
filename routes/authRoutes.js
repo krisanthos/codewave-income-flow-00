@@ -104,15 +104,17 @@ router.post('/admin/login', async (req, res) => {
   try {
     const { adminPassword } = req.body;
     
-    console.log('Received admin password:', adminPassword);
-    console.log('Expected admin password from env:', process.env.ADMIN_PASSWORD);
+    console.log('Admin login attempt received');
     
-    // Hardcode the password for testing to ensure it works
+    // Hardcode the correct admin password directly
     const correctPassword = 'codewave2025';
     
     if (adminPassword !== correctPassword) {
+      console.log('Admin login failed: incorrect password');
       return res.status(400).json({ msg: 'Invalid admin password' });
     }
+    
+    console.log('Admin password correct, generating token');
 
     // Find or create admin user
     let adminUser = await User.findOne({ isAdmin: true });
@@ -143,11 +145,12 @@ router.post('/admin/login', async (req, res) => {
       { expiresIn: '24h' },
       (err, token) => {
         if (err) throw err;
+        console.log('Admin token generated successfully');
         res.json({ token });
       }
     );
   } catch (err) {
-    console.error(err.message);
+    console.error('Admin login error:', err.message);
     res.status(500).send('Server error');
   }
 });

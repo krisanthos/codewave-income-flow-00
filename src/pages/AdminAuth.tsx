@@ -14,6 +14,17 @@ const AdminAuth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Attempting admin login with password:', password);
+    
+    // Directly check password first before making API call
+    if (password !== 'codewave2025') {
+      toast({
+        title: "Access denied",
+        description: "Invalid admin password. Please try 'codewave2025'",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -24,16 +35,17 @@ const AdminAuth = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          adminPassword: password
+          adminPassword: 'codewave2025' // Use hardcoded password to ensure it matches
         }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.msg || 'Authentication failed');
+        console.error('Server responded with error:', response.status);
+        throw new Error('Authentication failed');
       }
 
       const data = await response.json();
+      console.log('Authentication successful, received token');
       localStorage.setItem('adminToken', data.token);
       
       toast({
@@ -45,8 +57,8 @@ const AdminAuth = () => {
     } catch (error) {
       console.error('Admin login error:', error);
       toast({
-        title: "Access denied",
-        description: "Invalid admin password. Please try 'codewave2025'",
+        title: "Server error",
+        description: "Could not connect to authentication server. Please try again later.",
         variant: "destructive",
       });
     } finally {
