@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -230,31 +231,12 @@ const Signup = () => {
                   </p>
                 </div>
                 
-                <div className="space-y-4">
-                  <Label>Select Payment Method</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2 border rounded-md p-4 cursor-pointer hover:bg-gray-50">
-                      <input type="radio" id="transfer" name="paymentMethod" value="transfer" defaultChecked />
-                      <Label htmlFor="transfer">Bank Transfer</Label>
-                    </div>
-                    <div className="flex items-center space-x-2 border rounded-md p-4 cursor-pointer hover:bg-gray-50">
-                      <input type="radio" id="paystack" name="paymentMethod" value="paystack" />
-                      <Label htmlFor="paystack">Paystack</Label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                  <h4 className="font-medium">Bank Transfer Details:</h4>
-                  <p className="text-sm mt-2">
-                    Bank Name: Example Bank
-                    <br />
-                    Account Number: 1234567890
-                    <br />
-                    Account Name: CodeWave Ltd
+                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                  <p className="text-sm text-green-800 font-medium">
+                    We accept Paystack for secure and easy payments
                   </p>
                 </div>
-
+                
                 <Button 
                   type="button" 
                   onClick={handlePaystackPayment} 
@@ -267,9 +249,6 @@ const Signup = () => {
                 </p>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Processing..." : "Complete Registration"}
-                </Button>
                 <Button
                   type="button"
                   variant="outline"

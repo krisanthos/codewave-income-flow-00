@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -191,8 +192,14 @@ const AdminDashboard = () => {
 
         {/* Mobile menu */}
         {isMenuOpen && (
-          <div className="md:hidden">
+          <div className="md:hidden bg-gray-800 shadow-lg">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+              <div className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-700">
+                Dashboard
+              </div>
+              <div className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-700">
+                Users
+              </div>
               <button onClick={handleLogout} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-700">
                 Logout
               </button>
@@ -231,10 +238,10 @@ const AdminDashboard = () => {
         {/* Main content */}
         <main className="flex-1 md:ml-64 px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-7xl mx-auto">
-            <h1 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-6">Admin Dashboard</h1>
             
             {/* Overview stats */}
-            <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-gray-500">Total Users</CardTitle>
@@ -310,10 +317,10 @@ const AdminDashboard = () => {
                         />
                       </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-auto">
                       {filteredUsers.length > 0 ? (
                         <div className="rounded-md border">
-                          <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
+                          <div className="hidden md:grid md:grid-cols-5 border-b bg-gray-50 p-3 font-medium">
                             <div>Username</div>
                             <div>Full Name</div>
                             <div>Email</div>
@@ -322,15 +329,31 @@ const AdminDashboard = () => {
                           </div>
                           <div className="divide-y">
                             {filteredUsers.map((user) => (
-                              <div key={user.id} className="grid grid-cols-5 p-3">
-                                <div className="font-medium">{user.username}</div>
-                                <div>{user.fullName}</div>
-                                <div className="text-gray-500">{user.email}</div>
-                                <div className="text-right">₦{user.balance.toLocaleString()}</div>
-                                <div className="text-right">
+                              <div key={user.id} className="p-3">
+                                {/* Mobile view (card style) */}
+                                <div className="md:hidden space-y-2">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">{user.username}</span>
+                                    <span className="text-green-600 font-medium">₦{user.balance.toLocaleString()}</span>
+                                  </div>
+                                  <div>{user.fullName}</div>
+                                  <div className="text-gray-500 text-sm">{user.email}</div>
                                   <Link to={`/admin-user/${user.id}`}>
-                                    <Button size="sm">View Details</Button>
+                                    <Button size="sm" className="w-full mt-2">View Details</Button>
                                   </Link>
+                                </div>
+                                
+                                {/* Desktop view (table style) */}
+                                <div className="hidden md:grid md:grid-cols-5">
+                                  <div className="font-medium">{user.username}</div>
+                                  <div>{user.fullName}</div>
+                                  <div className="text-gray-500">{user.email}</div>
+                                  <div className="text-right">₦{user.balance.toLocaleString()}</div>
+                                  <div className="text-right">
+                                    <Link to={`/admin-user/${user.id}`}>
+                                      <Button size="sm">View Details</Button>
+                                    </Link>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -353,10 +376,10 @@ const AdminDashboard = () => {
                         All financial activities across the platform
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-auto">
                       {transactions.length > 0 ? (
                         <div className="rounded-md border">
-                          <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
+                          <div className="hidden md:grid md:grid-cols-5 border-b bg-gray-50 p-3 font-medium">
                             <div>User</div>
                             <div>Type</div>
                             <div>Amount</div>
@@ -365,28 +388,59 @@ const AdminDashboard = () => {
                           </div>
                           <div className="divide-y">
                             {transactions.map((transaction) => (
-                              <div key={transaction.id} className="grid grid-cols-5 p-3">
-                                <div className="font-medium">{transaction.username}</div>
-                                <div>
-                                  {transaction.type === 'deposit' && 'Deposit'}
-                                  {transaction.type === 'withdraw' && 'Withdrawal'}
-                                  {transaction.type === 'daily_bonus' && 'Daily Bonus'}
-                                  {transaction.type === 'task_reward' && 'Task Reward'}
+                              <div key={transaction.id} className="p-3">
+                                {/* Mobile view (card style) */}
+                                <div className="md:hidden space-y-2">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">{transaction.username}</span>
+                                    <span className={`${
+                                      transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
+                                    } font-medium`}>
+                                      ₦{transaction.amount.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span>{transaction.type === 'deposit' && 'Deposit'}
+                                      {transaction.type === 'withdraw' && 'Withdrawal'}
+                                      {transaction.type === 'daily_bonus' && 'Daily Bonus'}
+                                      {transaction.type === 'task_reward' && 'Task Reward'}</span>
+                                    <span>{transaction.date}</span>
+                                  </div>
+                                  <div>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                      transaction.status === 'completed' 
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {transaction.status}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className={`${
-                                  transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
-                                }`}>
-                                  ₦{transaction.amount.toLocaleString()}
-                                </div>
-                                <div>{transaction.date}</div>
-                                <div>
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                    transaction.status === 'completed' 
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-yellow-100 text-yellow-800'
+                                
+                                {/* Desktop view (table style) */}
+                                <div className="hidden md:grid md:grid-cols-5">
+                                  <div className="font-medium">{transaction.username}</div>
+                                  <div>
+                                    {transaction.type === 'deposit' && 'Deposit'}
+                                    {transaction.type === 'withdraw' && 'Withdrawal'}
+                                    {transaction.type === 'daily_bonus' && 'Daily Bonus'}
+                                    {transaction.type === 'task_reward' && 'Task Reward'}
+                                  </div>
+                                  <div className={`${
+                                    transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
                                   }`}>
-                                    {transaction.status}
-                                  </span>
+                                    ₦{transaction.amount.toLocaleString()}
+                                  </div>
+                                  <div>{transaction.date}</div>
+                                  <div>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                      transaction.status === 'completed' 
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {transaction.status}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             ))}
