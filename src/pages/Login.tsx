@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
+import { TEST_MODE } from "../utils/payments";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -25,6 +26,30 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      // In test mode, bypass the actual API call
+      if (TEST_MODE) {
+        console.log('TEST MODE: Simulating successful login for:', formData.email);
+        
+        // Create a fake token
+        const fakeToken = btoa(JSON.stringify({
+          id: 'test-user-' + Date.now(),
+          email: formData.email,
+          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
+        }));
+        
+        // Store the fake token
+        localStorage.setItem('userToken', fakeToken);
+        
+        toast({
+          title: "Login successful!",
+          description: "Redirecting to your dashboard...",
+        });
+        
+        navigate("/dashboard");
+        return;
+      }
+
+      // Regular API flow for production
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -76,6 +101,11 @@ const Login = () => {
           <CardHeader>
             <CardTitle>Login</CardTitle>
             <CardDescription>Enter your credentials to access your account</CardDescription>
+            {TEST_MODE && (
+              <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                Test Mode Active - Enter any email/password to login
+              </div>
+            )}
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
