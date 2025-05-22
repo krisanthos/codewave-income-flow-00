@@ -38,12 +38,23 @@ const Login = () => {
         }),
       });
 
-      const data = await response.json();
-
+      // First check if the response is OK before trying to parse JSON
       if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Login failed");
+        } else {
+          // Handle non-JSON responses
+          const errorText = await response.text();
+          console.error("Non-JSON error response:", errorText);
+          throw new Error("Login failed - Server error");
+        }
       }
 
+      // If response was ok, parse the JSON
+      const data = await response.json();
+      
       localStorage.setItem("userToken", data.token);
       toast({
         title: "Login successful!",
@@ -51,6 +62,7 @@ const Login = () => {
       });
       navigate("/dashboard");
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error.message || "Please check your credentials.",
