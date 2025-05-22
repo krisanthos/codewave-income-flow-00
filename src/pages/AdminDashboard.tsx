@@ -1,44 +1,140 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Menu, X, BarChart, Users, LogOut, Search } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+
+interface User {
+  id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  balance: number;
+  joined: string;
+}
+
+interface Transaction {
+  id: string;
+  userId: string;
+  username: string;
+  type: string;
+  amount: number;
+  date: string;
+  status: string;
+}
+
+interface Stats {
+  totalUsers: number;
+  totalTransactions: number;
+  totalBalance: number;
+  avgDailyEarnings: number;
+}
 
 const AdminDashboard = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    totalUsers: 0,
+    totalTransactions: 0,
+    totalBalance: 0,
+    avgDailyEarnings: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   
-  // Mock data - in a real app this would come from an API
-  const stats = {
-    totalUsers: 156,
-    totalTransactions: 2489,
-    totalBalance: 5628000, // in Naira
-    avgDailyEarnings: 85000,
-  };
-  
-  // Mock users data
-  const users = [
-    { id: 1, username: 'john_doe', fullName: 'John Doe', email: 'john@example.com', balance: 25000, joined: '2023-01-15' },
-    { id: 2, username: 'jane_smith', fullName: 'Jane Smith', email: 'jane@example.com', balance: 42000, joined: '2023-02-20' },
-    { id: 3, username: 'michael_b', fullName: 'Michael Brown', email: 'michael@example.com', balance: 18500, joined: '2023-03-05' },
-    { id: 4, username: 'sarah_j', fullName: 'Sarah Johnson', email: 'sarah@example.com', balance: 63000, joined: '2023-01-28' },
-    { id: 5, username: 'david_w', fullName: 'David Wilson', email: 'david@example.com', balance: 9500, joined: '2023-04-10' },
-  ];
-  
-  // Mock transactions data
-  const transactions = [
-    { id: 1, userId: 1, username: 'john_doe', type: 'deposit', amount: 10000, date: '2023-05-01', status: 'completed' },
-    { id: 2, userId: 2, username: 'jane_smith', type: 'withdraw', amount: 25000, date: '2023-05-02', status: 'pending' },
-    { id: 3, userId: 3, username: 'michael_b', type: 'task_reward', amount: 1500, date: '2023-05-03', status: 'completed' },
-    { id: 4, userId: 4, username: 'sarah_j', type: 'daily_bonus', amount: 3150, date: '2023-05-04', status: 'completed' },
-    { id: 5, userId: 5, username: 'david_w', type: 'deposit', amount: 5000, date: '2023-05-05', status: 'completed' },
-    { id: 6, userId: 1, username: 'john_doe', type: 'daily_bonus', amount: 1250, date: '2023-05-05', status: 'completed' },
-    { id: 7, userId: 2, username: 'jane_smith', type: 'task_reward', amount: 2000, date: '2023-05-06', status: 'completed' },
-  ];
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      navigate('/admin-auth');
+      return;
+    }
+
+    const fetchAdminData = async () => {
+      try {
+        // Fetch users
+        const usersResponse = await fetch('/api/admin/users', {
+          headers: {
+            'x-auth-token': token,
+          },
+        });
+
+        if (!usersResponse.ok) {
+          throw new Error('Failed to fetch users');
+        }
+
+        const usersData = await usersResponse.json();
+        
+        // Format users data
+        const formattedUsers = usersData.map((user: any) => ({
+          id: user._id,
+          username: user.username,
+          fullName: user.fullName,
+          email: user.email,
+          balance: user.balance,
+          joined: new Date(user.registrationDate).toLocaleDateString(),
+        }));
+        
+        setUsers(formattedUsers);
+        
+        // Fetch transactions
+        const transactionsResponse = await fetch('/api/admin/transactions', {
+          headers: {
+            'x-auth-token': token,
+          },
+        });
+
+        if (!transactionsResponse.ok) {
+          throw new Error('Failed to fetch transactions');
+        }
+
+        const transactionsData = await transactionsResponse.json();
+        
+        // Format transactions data
+        const formattedTransactions = transactionsData.map((transaction: any) => ({
+          id: transaction._id,
+          userId: transaction.user,
+          username: transaction.username || 'Unknown', // Backend should populate this
+          type: transaction.type,
+          amount: transaction.amount,
+          date: new Date(transaction.createdAt).toLocaleDateString(),
+          status: transaction.status,
+        }));
+        
+        setTransactions(formattedTransactions);
+        
+        // Calculate stats
+        const totalUsers = formattedUsers.length;
+        const totalTransactions = formattedTransactions.length;
+        const totalBalance = formattedUsers.reduce((sum, user) => sum + user.balance, 0);
+        
+        // Simplified calculation for average daily earnings (5% of total balance)
+        const avgDailyEarnings = Math.round(totalBalance * 0.05);
+        
+        setStats({
+          totalUsers,
+          totalTransactions,
+          totalBalance,
+          avgDailyEarnings,
+        });
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load admin dashboard data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAdminData();
+  }, [navigate]);
   
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -46,7 +142,7 @@ const AdminDashboard = () => {
   
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
-    navigate('/');
+    navigate('/admin-auth');
   };
   
   // Filter users based on search term
@@ -55,6 +151,18 @@ const AdminDashboard = () => {
     user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700">Loading admin dashboard...</h2>
+          <p className="text-gray-500 mt-2">Please wait while we fetch the data</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -110,7 +218,7 @@ const AdminDashboard = () => {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="text-gray-300 hover:bg-gray-800 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md mt-6"
+                  className="text-gray-300 hover:bg-gray-800 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md mt-6 w-full text-left"
                 >
                   <LogOut className="mr-3" size={20} />
                   Logout
@@ -203,30 +311,36 @@ const AdminDashboard = () => {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="rounded-md border">
-                        <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
-                          <div>Username</div>
-                          <div>Full Name</div>
-                          <div>Email</div>
-                          <div className="text-right">Balance</div>
-                          <div className="text-right">Actions</div>
-                        </div>
-                        <div className="divide-y">
-                          {filteredUsers.map((user) => (
-                            <div key={user.id} className="grid grid-cols-5 p-3">
-                              <div className="font-medium">{user.username}</div>
-                              <div>{user.fullName}</div>
-                              <div className="text-gray-500">{user.email}</div>
-                              <div className="text-right">₦{user.balance.toLocaleString()}</div>
-                              <div className="text-right">
-                                <Link to={`/admin-user/${user.id}`}>
-                                  <Button size="sm">View Details</Button>
-                                </Link>
+                      {filteredUsers.length > 0 ? (
+                        <div className="rounded-md border">
+                          <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
+                            <div>Username</div>
+                            <div>Full Name</div>
+                            <div>Email</div>
+                            <div className="text-right">Balance</div>
+                            <div className="text-right">Actions</div>
+                          </div>
+                          <div className="divide-y">
+                            {filteredUsers.map((user) => (
+                              <div key={user.id} className="grid grid-cols-5 p-3">
+                                <div className="font-medium">{user.username}</div>
+                                <div>{user.fullName}</div>
+                                <div className="text-gray-500">{user.email}</div>
+                                <div className="text-right">₦{user.balance.toLocaleString()}</div>
+                                <div className="text-right">
+                                  <Link to={`/admin-user/${user.id}`}>
+                                    <Button size="sm">View Details</Button>
+                                  </Link>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="py-8 text-center text-gray-500">
+                          {searchTerm ? "No users match your search" : "No users registered yet"}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -240,43 +354,49 @@ const AdminDashboard = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="rounded-md border">
-                        <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
-                          <div>User</div>
-                          <div>Type</div>
-                          <div>Amount</div>
-                          <div>Date</div>
-                          <div>Status</div>
-                        </div>
-                        <div className="divide-y">
-                          {transactions.map((transaction) => (
-                            <div key={transaction.id} className="grid grid-cols-5 p-3">
-                              <div className="font-medium">{transaction.username}</div>
-                              <div>
-                                {transaction.type === 'deposit' && 'Deposit'}
-                                {transaction.type === 'withdraw' && 'Withdrawal'}
-                                {transaction.type === 'daily_bonus' && 'Daily Bonus'}
-                                {transaction.type === 'task_reward' && 'Task Reward'}
-                              </div>
-                              <div className={`${
-                                transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
-                              }`}>
-                                ₦{transaction.amount.toLocaleString()}
-                              </div>
-                              <div>{transaction.date}</div>
-                              <div>
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                  transaction.status === 'completed' 
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-yellow-100 text-yellow-800'
+                      {transactions.length > 0 ? (
+                        <div className="rounded-md border">
+                          <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
+                            <div>User</div>
+                            <div>Type</div>
+                            <div>Amount</div>
+                            <div>Date</div>
+                            <div>Status</div>
+                          </div>
+                          <div className="divide-y">
+                            {transactions.map((transaction) => (
+                              <div key={transaction.id} className="grid grid-cols-5 p-3">
+                                <div className="font-medium">{transaction.username}</div>
+                                <div>
+                                  {transaction.type === 'deposit' && 'Deposit'}
+                                  {transaction.type === 'withdraw' && 'Withdrawal'}
+                                  {transaction.type === 'daily_bonus' && 'Daily Bonus'}
+                                  {transaction.type === 'task_reward' && 'Task Reward'}
+                                </div>
+                                <div className={`${
+                                  transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
                                 }`}>
-                                  {transaction.status}
-                                </span>
+                                  ₦{transaction.amount.toLocaleString()}
+                                </div>
+                                <div>{transaction.date}</div>
+                                <div>
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                    transaction.status === 'completed' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {transaction.status}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="py-8 text-center text-gray-500">
+                          No transactions recorded yet
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>

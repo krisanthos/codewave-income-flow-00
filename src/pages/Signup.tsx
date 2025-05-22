@@ -1,12 +1,12 @@
-
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
+import { initiateRegistrationPayment, completeRegistrationAfterPayment, hasPendingRegistration } from "../utils/payments";
 
 const Signup = () => {
   const [step, setStep] = useState(1);
@@ -20,6 +20,39 @@ const Signup = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for payment success from URL query params
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const paymentSuccess = queryParams.get('payment_success');
+    
+    const checkPendingRegistration = async () => {
+      if (paymentSuccess === 'true' || hasPendingRegistration()) {
+        setIsLoading(true);
+        
+        const result = await completeRegistrationAfterPayment();
+        
+        if (result.success) {
+          toast({
+            title: "Registration successful!",
+            description: "Your account has been created and you are now logged in.",
+          });
+          navigate('/dashboard');
+        } else {
+          toast({
+            title: "Registration failed",
+            description: "There was a problem creating your account.",
+            variant: "destructive",
+          });
+        }
+        
+        setIsLoading(false);
+      }
+    };
+    
+    checkPendingRegistration();
+  }, [location, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -49,39 +82,23 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      // Make an API call to register the user
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          username: formData.username,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
-          password: formData.password,
-        }),
+      // Instead of making direct API call here, we'll store user data and initiate payment
+      initiateRegistrationPayment({
+        fullName: formData.fullName,
+        username: formData.username,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        password: formData.password,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || 'Registration failed');
-      }
-
-      localStorage.setItem('userToken', data.token);
       
       toast({
-        title: "Registration successful!",
-        description: "Your account has been created and you are now logged in.",
+        title: "Payment initiated",
+        description: "Please complete the payment process to finish registration.",
       });
-      
-      navigate('/dashboard');
     } catch (error) {
       toast({
-        title: "Registration failed",
-        description: error instanceof Error ? error.message : "There was a problem creating your account.",
+        title: "Registration process failed",
+        description: error instanceof Error ? error.message : "There was a problem initiating the registration process.",
         variant: "destructive",
       });
     } finally {
@@ -90,8 +107,14 @@ const Signup = () => {
   };
 
   const handlePaystackPayment = () => {
-    // Open the Paystack payment link in a new tab
-    window.open('https://paystack.shop/pay/cjq84w--6d', '_blank');
+    // Use the updated function with user data
+    initiateRegistrationPayment({
+      fullName: formData.fullName,
+      username: formData.username,
+      email: formData.email,
+      phoneNumber: formData.phoneNumber,
+      password: formData.password,
+    });
   };
 
   return (
@@ -221,7 +244,6 @@ const Signup = () => {
                   </div>
                 </div>
                 
-                {/* Bank details section - would be dynamic based on payment choice */}
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
                   <h4 className="font-medium">Bank Transfer Details:</h4>
                   <p className="text-sm mt-2">
@@ -233,7 +255,6 @@ const Signup = () => {
                   </p>
                 </div>
 
-                {/* Paystack Payment Button */}
                 <Button 
                   type="button" 
                   onClick={handlePaystackPayment} 

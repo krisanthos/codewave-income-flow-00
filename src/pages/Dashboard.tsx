@@ -1,41 +1,213 @@
-
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Menu, X, ArrowRight, User, BarChart, LogOut } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+
+interface UserData {
+  username: string;
+  fullName: string;
+  balance: number;
+  email: string;
+  phoneNumber: string;
+  joinedDate: string;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  date: string;
+  status: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  reward: number;
+  duration: string;
+  completed: boolean;
+}
 
 const Dashboard = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // Mock data - in a real app this would come from an API
-  const userData = {
-    username: "johndoe",
-    fullName: "John Doe",
-    balance: 15000,
-    dailyBonus: 750,
-    joinedDate: new Date().toLocaleDateString(),
-    transactions: [
-      { id: 1, type: "deposit", amount: 10000, date: "2023-05-01", status: "completed" },
-      { id: 2, type: "daily_bonus", amount: 500, date: "2023-05-02", status: "completed" },
-      { id: 3, type: "task_reward", amount: 2000, date: "2023-05-03", status: "completed" },
-      { id: 4, type: "withdraw", amount: 5000, date: "2023-05-04", status: "pending" },
-    ],
+  useEffect(() => {
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        // Fetch user data
+        const userResponse = await fetch("/api/users/me", {
+          headers: {
+            "x-auth-token": token,
+          },
+        });
+        
+        if (!userResponse.ok) {
+          throw new Error("Failed to fetch user data");
+        }
+        
+        const userData = await userResponse.json();
+        
+        // Format the user data
+        setUserData({
+          username: userData.username,
+          fullName: userData.fullName,
+          balance: userData.balance,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+          joinedDate: new Date(userData.registrationDate).toLocaleDateString(),
+        });
+        
+        // Fetch transactions
+        const transactionsResponse = await fetch("/api/users/transactions", {
+          headers: {
+            "x-auth-token": token,
+          },
+        });
+        
+        if (!transactionsResponse.ok) {
+          throw new Error("Failed to fetch transactions");
+        }
+        
+        const transactionsData = await transactionsResponse.json();
+        
+        // Format transactions
+        setTransactions(
+          transactionsData.map((transaction: any) => ({
+            id: transaction._id,
+            type: transaction.type,
+            amount: transaction.amount,
+            date: new Date(transaction.createdAt).toLocaleDateString(),
+            status: transaction.status,
+          }))
+        );
+        
+        // Fetch tasks
+        const tasksResponse = await fetch("/api/users/tasks", {
+          headers: {
+            "x-auth-token": token,
+          },
+        });
+        
+        if (!tasksResponse.ok) {
+          throw new Error("Failed to fetch tasks");
+        }
+        
+        const tasksData = await tasksResponse.json();
+        
+        // Format tasks
+        setTasks(
+          tasksData.map((task: any) => ({
+            id: task._id,
+            title: task.title,
+            reward: task.reward,
+            duration: `${task.estimatedMinutes} min`,
+            completed: false,
+          }))
+        );
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [navigate]);
+
+  const handleTaskCompletion = async (taskId: string) => {
+    const token = localStorage.getItem("userToken");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`/api/users/complete-task/${taskId}`, {
+        method: "POST",
+        headers: {
+          "x-auth-token": token,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to complete task");
+      }
+      
+      const data = await response.json();
+      
+      // Update tasks
+      setTasks(
+        tasks.map(task => 
+          task.id === taskId ? { ...task, completed: true } : task
+        )
+      );
+      
+      // Update user balance
+      if (userData) {
+        setUserData({
+          ...userData,
+          balance: data.balance,
+        });
+      }
+      
+      toast({
+        title: "Task completed",
+        description: "You have earned a reward for completing this task",
+      });
+      
+    } catch (error) {
+      console.error("Error completing task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to complete task",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Mock tasks
-  const tasks = [
-    { id: 1, title: "Watch promotional video", reward: 200, duration: "2 min", completed: false },
-    { id: 2, title: "Complete survey about mobile phones", reward: 500, duration: "5 min", completed: false },
-    { id: 3, title: "Like and follow Facebook page", reward: 300, duration: "1 min", completed: true },
-    { id: 4, title: "Install and register on partner app", reward: 1000, duration: "10 min", completed: false },
-  ];
+  const handleLogout = () => {
+    localStorage.removeItem("userToken");
+    navigate("/");
+  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+
+  // Calculate daily bonus based on balance (5% daily)
+  const calculateDailyBonus = (balance: number) => {
+    return Math.round(balance * 0.05); // 5% of balance
+  };
+
+  // Show loading state
+  if (isLoading || !userData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700">Loading your dashboard...</h2>
+          <p className="text-gray-500 mt-2">Please wait while we fetch your data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -89,9 +261,12 @@ const Dashboard = () => {
               <Link to="/support" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
                 Support
               </Link>
-              <Link to="/" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
+              <button 
+                onClick={handleLogout}
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+              >
                 Logout
-              </Link>
+              </button>
             </div>
           </div>
         )}
@@ -128,10 +303,13 @@ const Dashboard = () => {
                   <ArrowRight className="mr-3" size={20} />
                   Support
                 </Link>
-                <Link to="/" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md mt-6">
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md mt-6 w-full text-left"
+                >
                   <LogOut className="mr-3" size={20} />
                   Logout
-                </Link>
+                </button>
               </div>
             </div>
           </div>
@@ -149,7 +327,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">₦{userData.balance.toLocaleString()}</div>
-                  <p className="text-xs text-green-600 mt-1">+₦{userData.dailyBonus} daily bonus</p>
+                  <p className="text-xs text-green-600 mt-1">+₦{calculateDailyBonus(userData.balance)} daily bonus</p>
                 </CardContent>
               </Card>
               <Card>
@@ -197,14 +375,18 @@ const Dashboard = () => {
                       <div className="mt-6">
                         <h3 className="font-medium text-gray-900">Quick Actions</h3>
                         <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <Button variant="outline" className="justify-start">
-                            <ArrowRight className="mr-2" size={16} />
-                            Find Tasks
-                          </Button>
-                          <Button variant="outline" className="justify-start">
-                            <ArrowRight className="mr-2" size={16} />
-                            Deposit Funds
-                          </Button>
+                          <Link to="/tasks">
+                            <Button variant="outline" className="w-full justify-start">
+                              <ArrowRight className="mr-2" size={16} />
+                              Find Tasks
+                            </Button>
+                          </Link>
+                          <Link to="/deposit">
+                            <Button variant="outline" className="w-full justify-start">
+                              <ArrowRight className="mr-2" size={16} />
+                              Deposit Funds
+                            </Button>
+                          </Link>
                         </div>
                       </div>
                     </CardContent>
@@ -221,27 +403,32 @@ const Dashboard = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="divide-y divide-gray-200">
-                        {tasks.map((task) => (
-                          <div key={task.id} className="py-4">
-                            <div className="flex justify-between">
-                              <div>
-                                <h4 className="font-medium text-gray-900">{task.title}</h4>
-                                <p className="text-sm text-gray-500">Duration: {task.duration}</p>
-                              </div>
-                              <div className="text-right">
-                                <span className="block text-green-600 font-medium">₦{task.reward}</span>
-                                <Button
-                                  size="sm"
-                                  className="mt-2"
-                                  variant={task.completed ? "secondary" : "default"}
-                                  disabled={task.completed}
-                                >
-                                  {task.completed ? "Completed" : "Start Task"}
-                                </Button>
+                        {tasks.length > 0 ? (
+                          tasks.map((task) => (
+                            <div key={task.id} className="py-4">
+                              <div className="flex justify-between">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">{task.title}</h4>
+                                  <p className="text-sm text-gray-500">Duration: {task.duration}</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="block text-green-600 font-medium">₦{task.reward}</span>
+                                  <Button
+                                    size="sm"
+                                    className="mt-2"
+                                    variant={task.completed ? "secondary" : "default"}
+                                    disabled={task.completed}
+                                    onClick={() => !task.completed && handleTaskCompletion(task.id)}
+                                  >
+                                    {task.completed ? "Completed" : "Start Task"}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))
+                        ) : (
+                          <p className="py-8 text-center text-gray-500">No tasks available at the moment. Check back soon!</p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -257,31 +444,35 @@ const Dashboard = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="divide-y divide-gray-200">
-                        {userData.transactions.map((transaction) => (
-                          <div key={transaction.id} className="py-4 flex justify-between">
-                            <div>
-                              <h4 className="font-medium text-gray-900">
-                                {transaction.type === 'deposit' && 'Deposit'}
-                                {transaction.type === 'withdraw' && 'Withdrawal'}
-                                {transaction.type === 'daily_bonus' && 'Daily Bonus'}
-                                {transaction.type === 'task_reward' && 'Task Reward'}
-                              </h4>
-                              <p className="text-sm text-gray-500">{transaction.date}</p>
+                        {transactions.length > 0 ? (
+                          transactions.map((transaction) => (
+                            <div key={transaction.id} className="py-4 flex justify-between">
+                              <div>
+                                <h4 className="font-medium text-gray-900">
+                                  {transaction.type === 'deposit' && 'Deposit'}
+                                  {transaction.type === 'withdraw' && 'Withdrawal'}
+                                  {transaction.type === 'daily_bonus' && 'Daily Bonus'}
+                                  {transaction.type === 'task_reward' && 'Task Reward'}
+                                </h4>
+                                <p className="text-sm text-gray-500">{transaction.date}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className={`block font-medium ${
+                                  transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
+                                }`}>
+                                  {transaction.type === 'withdraw' ? '-' : '+'} ₦{transaction.amount.toLocaleString()}
+                                </span>
+                                <span className={`text-xs ${
+                                  transaction.status === 'completed' ? 'text-green-500' : 'text-yellow-500'
+                                }`}>
+                                  {transaction.status}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <span className={`block font-medium ${
-                                transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
-                              }`}>
-                                {transaction.type === 'withdraw' ? '-' : '+'} ₦{transaction.amount.toLocaleString()}
-                              </span>
-                              <span className={`text-xs ${
-                                transaction.status === 'completed' ? 'text-green-500' : 'text-yellow-500'
-                              }`}>
-                                {transaction.status}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          ))
+                        ) : (
+                          <p className="py-8 text-center text-gray-500">No transactions yet. Your activity will appear here.</p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
