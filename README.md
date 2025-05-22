@@ -1,4 +1,4 @@
-# This;is;codewave source code
+# This is codewave source code
 
 ## Project info
 
