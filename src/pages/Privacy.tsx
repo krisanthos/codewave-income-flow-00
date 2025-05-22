@@ -9,7 +9,7 @@ const Privacy = () => {
   const [adminAnswer, setAdminAnswer] = useState('');
   const [redirect, setRedirect] = useState(false);
 
-  // Hidden admin access via milk carton easter egg
+  // Hidden admin access via milk carton easter egg (activated by double click)
   const handleMilkCartonClick = () => {
     setAdminModalOpen(true);
   };
@@ -86,7 +86,7 @@ const Privacy = () => {
             alt="Recycling Symbol"
             className="w-8 h-8 mx-auto mb-2"
           />
-          <span className="text-sm text-gray-400">Drink more milk</span>
+          <span className="text-sm text-gray-400">Sustainability</span>
         </div>
       </main>
       
