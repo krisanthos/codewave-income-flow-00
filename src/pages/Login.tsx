@@ -19,34 +19,42 @@ const Login = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+		const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
 
-    try {
-      // In a real app, you would make an API call here
-      // const response = await fetch('/api/auth/login', {...})
-      
-      // For demo purposes:
-      setTimeout(() => {
-        localStorage.setItem('userToken', 'demo-token');
-        toast({
-          title: "Login successful!",
-          description: "Redirecting to your dashboard...",
-        });
-        navigate('/dashboard');
-      }, 1000);
-    } catch (error) {
-      toast({
-        title: "Login failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Login failed");
     }
-  };
+
+    localStorage.setItem("userToken", data.token);
+    toast({
+      title: "Login successful!",
+      description: "Redirecting to your dashboard...",
+    });
+    navigate("/dashboard");
+  } catch (error: any) {
+    toast({
+      title: "Login failed",
+      description: error.message || "Please check your credentials.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};S
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
