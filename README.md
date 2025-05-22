@@ -1,59 +1,76 @@
-# This is codewave source code
 
-## Project info
+# CodeWave - Earn Online Platform
 
-**URL**: https://lovable.dev/projects/c40215ef-5e26-4bf9-95a3-7092882caad7
+## Project Overview
 
-## How can I edit this code?
+CodeWave is a robust online earning platform that enables users to make money through simple tasks and referrals. The platform features a comprehensive user dashboard, secure authentication system, and integrated payment processing.
 
-There are several ways of editing your application.
+## Tech Stack
 
+This project is built with modern technologies:
 
-**Use your preferred IDE**
+- **Frontend**: 
+  - React with TypeScript
+  - Vite for fast development
+  - Tailwind CSS for responsive styling
+  - shadcn/ui for component library
 
-If i want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Backend**:
+  - Node.js with Express
+  - MongoDB for database
+  - JWT for authentication
+  - Paystack integration for payments
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Key Features
 
-Follow these steps:
+- **User Authentication**: Secure login and registration system
+- **Task Management**: Complete tasks to earn rewards
+- **Payment Processing**: Integrated payment system with Paystack
+- **Admin Dashboard**: Comprehensive admin controls and monitoring
+- **Responsive Design**: Mobile-friendly interface that works on all devices
+
+## Development Setup
+
+To set up the project locally:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone <repository-url>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd codewave
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Payment System
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The platform includes a dual-mode payment system:
 
-**Use GitHub Codespaces**
+- **Test Mode**: For testing and development - simulates payments without actual transactions
+- **Production Mode**: Live payment processing through Paystack integration
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## API Endpoints
 
-## What technologies are used for this project?
+The backend provides several API endpoints:
 
-This project is built with:
+- `/api/auth/*` - Authentication routes (login, registration, etc.)
+- `/api/users/*` - User management endpoints
+- `/api/admin/*` - Admin dashboard endpoints
+- `/api/transactions/*` - Payment transaction endpoints
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deployment
 
-## How can I deploy this project?
+The application can be deployed using any standard hosting service that supports Node.js applications. The frontend build is generated using Vite's production build process.
 
+## License
+
+This project is proprietary software owned by CodeWave. All rights reserved.
+
+---
+
+*Keywords: earn online, make money online, micro tasks, online income, passive income, codewave, cash earning platform, nigerian online platform, task rewards, online jobs*

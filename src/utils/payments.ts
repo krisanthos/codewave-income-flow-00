@@ -55,22 +55,33 @@ export const completeRegistrationAfterPayment = async () => {
     const parsedUserData = JSON.parse(userData);
     
     if (TEST_MODE) {
-      console.log('TEST MODE: Simulating successful API registration', parsedUserData);
+      console.log('TEST MODE: Creating database entry for user in test mode', parsedUserData);
       
-      // Create a fake token
-      const fakeToken = btoa(JSON.stringify({
-        id: 'test-user-' + Date.now(),
-        email: parsedUserData.email,
-        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
-      }));
+      // Make an API call to register the user even in test mode
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...parsedUserData,
+          testMode: TEST_MODE // Flag to indicate this is a test mode registration
+        }),
+      });
       
-      // Store the fake token
-      localStorage.setItem('userToken', fakeToken);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.msg || 'Registration failed');
+      }
+      
+      // Store the token
+      localStorage.setItem('userToken', data.token);
       
       // Clear the stored data
       sessionStorage.removeItem('pendingUserRegistration');
       
-      return { success: true, token: fakeToken };
+      return { success: true, token: data.token };
     }
     
     // Make an API call to register the user

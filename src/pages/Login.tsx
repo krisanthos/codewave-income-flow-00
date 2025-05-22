@@ -26,36 +26,16 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // In test mode, bypass the actual API call
-      if (TEST_MODE) {
-        console.log('TEST MODE: Simulating successful login for:', formData.email);
-        
-        // Create a fake token
-        const fakeToken = btoa(JSON.stringify({
-          id: 'test-user-' + Date.now(),
-          email: formData.email,
-          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
-        }));
-        
-        // Store the fake token
-        localStorage.setItem('userToken', fakeToken);
-        
-        toast({
-          title: "Login successful!",
-          description: "Redirecting to your dashboard...",
-        });
-        
-        navigate("/dashboard");
-        return;
-      }
-
-      // Regular API flow for production
+      // Even in test mode, make the API call to check credentials
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          testMode: TEST_MODE // Flag to indicate this is a test mode login
+        }),
       });
 
       const data = await response.json();
@@ -103,7 +83,7 @@ const Login = () => {
             <CardDescription>Enter your credentials to access your account</CardDescription>
             {TEST_MODE && (
               <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
-                Test Mode Active - Enter any email/password to login
+                Test Mode Active - Payment not required, but account must exist
               </div>
             )}
           </CardHeader>
