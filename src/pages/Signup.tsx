@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
-import { initiateRegistrationPayment, completeRegistrationAfterPayment, hasPendingRegistration } from "../utils/payments";
+import { initiateRegistrationPayment, completeRegistrationAfterPayment, hasPendingRegistration, TEST_MODE } from "../utils/payments";
 
 const Signup = () => {
   const [step, setStep] = useState(1);
@@ -92,10 +92,17 @@ const Signup = () => {
         password: formData.password,
       });
       
-      toast({
-        title: "Payment initiated",
-        description: "Please complete the payment process to finish registration.",
-      });
+      if (TEST_MODE) {
+        toast({
+          title: "Test Mode Active",
+          description: "Registration processed in test mode - no actual payment required.",
+        });
+      } else {
+        toast({
+          title: "Payment initiated",
+          description: "Please complete the payment process to finish registration.",
+        });
+      }
     } catch (error) {
       toast({
         title: "Registration process failed",
@@ -145,6 +152,11 @@ const Signup = () => {
                 ? "Fill in your personal information"
                 : "Complete registration with payment"}
             </CardDescription>
+            {TEST_MODE && (
+              <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                Test Mode Active - No actual payment will be processed
+              </div>
+            )}
           </CardHeader>
           {step === 1 ? (
             <form onSubmit={handleNextStep}>
@@ -228,24 +240,29 @@ const Signup = () => {
                     Registration fee: ₦5,000 
                     <br />
                     (₦2,500 will be credited to your account after registration)
+                    {TEST_MODE && <span className="font-semibold"><br />Test mode: No payment required</span>}
                   </p>
                 </div>
                 
                 <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                   <p className="text-sm text-green-800 font-medium">
-                    We accept Paystack for secure and easy payments
+                    {TEST_MODE 
+                      ? "Test mode active - click below to simulate payment" 
+                      : "We accept Paystack for secure and easy payments"}
                   </p>
                 </div>
                 
                 <Button 
                   type="button" 
                   onClick={handlePaystackPayment} 
-                  className="w-full bg-green-600 hover:bg-green-700"
+                  className={`w-full ${TEST_MODE ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-600 hover:bg-green-700'}`}
                 >
-                  Pay with Paystack
+                  {TEST_MODE ? "Simulate Payment" : "Pay with Paystack"}
                 </Button>
                 <p className="text-xs text-center text-gray-500">
-                  Click the button above to proceed to secure payment with Paystack
+                  {TEST_MODE 
+                    ? "Click the button above to simulate a successful payment" 
+                    : "Click the button above to proceed to secure payment with Paystack"}
                 </p>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
