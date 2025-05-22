@@ -19,7 +19,8 @@ const Index = () => {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/" className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-blue-600">CodeWave</span>
+                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-8" />
+                <span className="ml-2 text-2xl font-bold text-blue-600">CodeWave</span>
               </Link>
             </div>
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
@@ -67,6 +68,9 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-12 md:py-20">
             <div className="text-center">
+              <div className="flex justify-center mb-8">
+                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-24" />
+              </div>
               <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
                 <span className="block">Earn Money Through</span>
                 <span className="block text-blue-600">Simple Daily Tasks</span>
@@ -108,7 +112,8 @@ const Index = () => {
       <footer className="bg-gray-800">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="md:flex md:items-center md:justify-between">
-            <div className="flex justify-center md:justify-start">
+            <div className="flex justify-center md:justify-start items-center">
+              <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-8 mr-2" />
               <span className="text-xl font-bold text-white">CodeWave</span>
             </div>
             <div className="mt-8 md:mt-0">

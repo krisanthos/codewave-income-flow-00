@@ -89,6 +89,11 @@ const Signup = () => {
     }
   };
 
+  const handlePaystackPayment = () => {
+    // Open the Paystack payment link in a new tab
+    window.open('https://paystack.shop/pay/cjq84w--6d', '_blank');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -97,7 +102,10 @@ const Signup = () => {
             <ArrowLeft className="mr-2" size={16} />
             Back to Home
           </Link>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Create your account</h2>
+          <div className="flex justify-center mb-4">
+            <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-16" />
+          </div>
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">Create your account</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
             <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
@@ -224,6 +232,18 @@ const Signup = () => {
                     Account Name: CodeWave Ltd
                   </p>
                 </div>
+
+                {/* Paystack Payment Button */}
+                <Button 
+                  type="button" 
+                  onClick={handlePaystackPayment} 
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  Pay with Paystack
+                </Button>
+                <p className="text-xs text-center text-gray-500">
+                  Click the button above to proceed to secure payment with Paystack
+                </p>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
                 <Button type="submit" className="w-full" disabled={isLoading}>
