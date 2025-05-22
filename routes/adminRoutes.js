@@ -1,10 +1,10 @@
 
-const express = require('express');
-const auth = require('../middleware/auth');
-const adminAuth = require('../middleware/adminAuth');
-const User = require('../models/User');
-const Transaction = require('../models/Transaction');
-const Task = require('../models/Task');
+import express from 'express';
+import auth from '../middleware/auth.js';
+import adminAuth from '../middleware/adminAuth.js';
+import User from '../models/User.js';
+import Transaction from '../models/Transaction.js';
+import Task from '../models/Task.js';
 
 const router = express.Router();
 
@@ -119,4 +119,4 @@ router.get('/statistics', [auth, adminAuth], async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

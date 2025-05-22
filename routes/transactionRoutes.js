@@ -1,9 +1,9 @@
 
-const express = require('express');
-const auth = require('../middleware/auth');
-const adminAuth = require('../middleware/adminAuth');
-const Transaction = require('../models/Transaction');
-const User = require('../models/User');
+import express from 'express';
+import auth from '../middleware/auth.js';
+import adminAuth from '../middleware/adminAuth.js';
+import Transaction from '../models/Transaction.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
@@ -74,4 +74,4 @@ router.post('/confirm-payment/:id', [auth, adminAuth], async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
