@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from '@/hooks/use-toast';
 
 const AdminAuth = () => {
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = codewave2025;
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   
@@ -19,7 +19,7 @@ const AdminAuth = () => {
     if (password !== 'codewave2025') {
       toast({
         title: "Access denied",
-        description: "Invalid admin password. Please try 'codewave2025'",
+        description: "Invalid admin password",
         variant: "destructive",
       });
       return;
@@ -74,7 +74,6 @@ const AdminAuth = () => {
           <CardDescription>
             This area is restricted to authorized personnel only.
             <br />
-            <span className="text-blue-500">Password: codewave2025</span>
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
