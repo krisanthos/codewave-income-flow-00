@@ -49,22 +49,39 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      // In a real app, you would make an API call here
-      // const response = await fetch('/api/auth/register', {...})
+      // Make an API call to register the user
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          username: formData.username,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || 'Registration failed');
+      }
+
+      localStorage.setItem('userToken', data.token);
       
-      // For demo purposes:
-      setTimeout(() => {
-        localStorage.setItem('userToken', 'demo-token');
-        toast({
-          title: "Registration successful!",
-          description: "Your account has been created and you are now logged in.",
-        });
-        navigate('/dashboard');
-      }, 1000);
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created and you are now logged in.",
+      });
+      
+      navigate('/dashboard');
     } catch (error) {
       toast({
         title: "Registration failed",
-        description: "There was a problem creating your account.",
+        description: error instanceof Error ? error.message : "There was a problem creating your account.",
         variant: "destructive",
       });
     } finally {
@@ -190,8 +207,8 @@ const Signup = () => {
                       <Label htmlFor="transfer">Bank Transfer</Label>
                     </div>
                     <div className="flex items-center space-x-2 border rounded-md p-4 cursor-pointer hover:bg-gray-50">
-                      <input type="radio" id="flutterwave" name="paymentMethod" value="flutterwave" />
-                      <Label htmlFor="flutterwave">Flutterwave</Label>
+                      <input type="radio" id="paystack" name="paymentMethod" value="paystack" />
+                      <Label htmlFor="paystack">Paystack</Label>
                     </div>
                   </div>
                 </div>

@@ -16,26 +16,35 @@ const AdminAuth = () => {
     setIsLoading(true);
     
     try {
-      // In a real app, you would verify with the backend
-      // For demo purposes, we'll use a hardcoded password
-      if (password === 'admin123') {
-        localStorage.setItem('adminToken', 'admin-demo-token');
-        toast({
-          title: "Admin access granted",
-          description: "Redirecting to admin dashboard...",
-        });
-        navigate('/admin-dashboard');
-      } else {
-        toast({
-          title: "Access denied",
-          description: "Invalid admin password",
-          variant: "destructive",
-        });
+      // Make an API call to authenticate admin
+      const response = await fetch('/api/auth/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminPassword: password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || 'Authentication failed');
       }
+
+      localStorage.setItem('adminToken', data.token);
+      
+      toast({
+        title: "Admin access granted",
+        description: "Redirecting to admin dashboard...",
+      });
+      
+      navigate('/admin-dashboard');
     } catch (error) {
       toast({
-        title: "Authentication failed",
-        description: "An error occurred during authentication",
+        title: "Access denied",
+        description: "Invalid admin password",
         variant: "destructive",
       });
     } finally {
