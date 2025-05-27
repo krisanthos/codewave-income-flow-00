@@ -2,133 +2,260 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ArrowRight } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, Smartphone, DollarSign, Users, Star, Facebook, Instagram, Youtube, Twitter } from "lucide-react";
 
 const Index = () => {
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm">
+      <nav className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex-shrink-0 flex items-center">
-                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-8" />
-                <span className="ml-2 text-2xl font-bold text-blue-600">CodeWave</span>
-              </Link>
+              <div className="flex-shrink-0 flex items-center">
+                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-10" />
+                <span className="ml-2 text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">CodeWave</span>
+              </div>
             </div>
-            <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
-              <Link to="/login" className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                Login
+            <div className="flex items-center space-x-4">
+              <Link to="/login">
+                <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
+                  Login
+                </Button>
               </Link>
-              <Link to="/signup" className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                Signup
+              <Link to="/signup">
+                <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+                  Get Started
+                </Button>
               </Link>
-              <Link to="/about" className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                About Us
-              </Link>
-            </div>
-            <div className="flex items-center md:hidden">
-              <button
-                onClick={toggleMenu}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-              >
-                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
             </div>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="pt-2 pb-3 space-y-1">
-              <Link to="/login" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Login
-              </Link>
-              <Link to="/signup" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Signup
-              </Link>
-              <Link to="/about" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                About Us
-              </Link>
-            </div>
-          </div>
-        )}
       </nav>
 
-      {/* Hero section */}
-      <main className="flex-grow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-12 md:py-20">
-            <div className="text-center">
-              <div className="flex justify-center mb-8">
-                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-24" />
-              </div>
-              <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-                <span className="block">Earn Money Through</span>
-                <span className="block text-blue-600">Simple Daily Tasks</span>
-              </h1>
-              <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-                Join CodeWave today and start earning by watching ads, engaging with social media, and completing simple tasks.
-              </p>
-              <div className="mt-8 sm:max-w-lg sm:mx-auto sm:text-center">
-                <Link to="/signup">
-                  <Button className="mt-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10">
-                    Get Started <ArrowRight className="ml-2" size={16} />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Features section */}
-          <div className="py-12 bg-white">
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="p-6 border border-gray-200 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-900">Complete Tasks</h3>
-                <p className="mt-2 text-base text-gray-500">Earn money by watching ads, liking social media posts, and completing other simple tasks.</p>
-              </div>
-              <div className="p-6 border border-gray-200 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-900">Daily Bonus</h3>
-                <p className="mt-2 text-base text-gray-500">Earn up to 5% daily bonus on your balance. The more you have, the more you earn!</p>
-              </div>
-              <div className="p-6 border border-gray-200 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-900">Easy Withdrawals</h3>
-                <p className="mt-2 text-base text-gray-500">Withdraw your earnings directly to your bank account once you reach the minimum threshold.</p>
-              </div>
+      {/* Hero Section */}
+      <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="animate-fade-in-up">
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+              Earn Money by
+              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"> 
+                {" "}Engaging{" "}
+              </span>
+              on Social Media
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+              Join thousands earning daily by watching ads, liking posts, and engaging with social media content. 
+              Start with just ₦5,000 and get ₦2,500 credited to your wallet instantly!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/signup">
+                <Button size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                  Start Earning Today
+                  <ArrowRight className="ml-2" size={20} />
+                </Button>
+              </Link>
+              <Link to="/privacy">
+                <Button variant="outline" size="lg" className="border-green-200 text-green-700 hover:bg-green-50 px-8 py-4 text-lg">
+                  Learn More
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
-      </main>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 bg-white/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              How You Earn with CodeWave
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Simple tasks, real money. Complete social media engagements and watch your earnings grow.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <Card className="bg-white border-green-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              <CardHeader className="text-center">
+                <div className="mx-auto bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                  <Facebook className="text-green-600" size={32} />
+                </div>
+                <CardTitle className="text-green-800">Like Posts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-center">
+                  Like Facebook posts and earn ₦25-₦50 per engagement
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-green-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              <CardHeader className="text-center">
+                <div className="mx-auto bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                  <Instagram className="text-green-600" size={32} />
+                </div>
+                <CardTitle className="text-green-800">Follow Accounts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-center">
+                  Follow Instagram accounts and earn ₦40-₦60 per follow
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-green-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              <CardHeader className="text-center">
+                <div className="mx-auto bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                  <Youtube className="text-green-600" size={32} />
+                </div>
+                <CardTitle className="text-green-800">Watch Videos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-center">
+                  Watch promotional videos and earn ₦75-₦100 per video
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-green-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              <CardHeader className="text-center">
+                <div className="mx-auto bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                  <Twitter className="text-green-600" size={32} />
+                </div>
+                <CardTitle className="text-green-800">Share Content</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-center">
+                  Share posts on social media and earn ₦60-₦100 per share
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="animate-counter">
+              <div className="text-4xl md:text-5xl font-bold mb-2">10,000+</div>
+              <div className="text-xl opacity-90">Active Earners</div>
+            </div>
+            <div className="animate-counter">
+              <div className="text-4xl md:text-5xl font-bold mb-2">₦500M+</div>
+              <div className="text-xl opacity-90">Total Paid Out</div>
+            </div>
+            <div className="animate-counter">
+              <div className="text-4xl md:text-5xl font-bold mb-2">24/7</div>
+              <div className="text-xl opacity-90">Support Available</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-16 bg-white/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Start Earning in 3 Simple Steps
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                <span className="text-3xl font-bold text-green-600">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Register & Pay Entry Fee</h3>
+              <p className="text-gray-600">
+                Sign up with ₦5,000 registration fee and get ₦2,500 instantly credited to your wallet
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                <span className="text-3xl font-bold text-green-600">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Complete Tasks</h3>
+              <p className="text-gray-600">
+                Watch ads, like posts, follow accounts, and engage with social media content
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                <span className="text-3xl font-bold text-green-600">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Withdraw Earnings</h3>
+              <p className="text-gray-600">
+                Transfer your earnings directly to your bank account or mobile money
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 bg-gradient-to-br from-green-50 to-emerald-100">
+        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+            Ready to Start Earning?
+          </h2>
+          <p className="text-xl text-gray-600 mb-8">
+            Join thousands of Nigerians already earning money through social media engagement
+          </p>
+          <Link to="/signup">
+            <Button size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-12 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              Start Earning Now - Pay ₦5,000, Get ₦2,500 Free!
+              <ArrowRight className="ml-2" size={20} />
+            </Button>
+          </Link>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800">
-        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex justify-center md:justify-start items-center">
-              <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-8 mr-2" />
-              <span className="text-xl font-bold text-white">CodeWave</span>
-            </div>
-            <div className="mt-8 md:mt-0">
-              <p className="text-center text-base text-gray-400 md:text-left">
-                &copy; 2025 CodeWave. All rights reserved.
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center mb-4">
+                <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-8" />
+                <span className="ml-2 text-xl font-bold">CodeWave</span>
+              </div>
+              <p className="text-gray-400">
+                Nigeria's leading social media earning platform
               </p>
-              <div className="mt-4 flex justify-center md:justify-start space-x-6">
-                <Link to="/privacy" className="text-gray-400 hover:text-gray-300">
-                  Privacy Policy
-                </Link>
-                <Link to="/terms" className="text-gray-400 hover:text-gray-300">
-                  Terms of Service
-                </Link>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4">Platform</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><Link to="/dashboard" className="hover:text-white">Dashboard</Link></li>
+                <li><Link to="/signup" className="hover:text-white">Sign Up</Link></li>
+                <li><Link to="/login" className="hover:text-white">Login</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4">Support</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">Help Center</a></li>
+                <li><a href="#" className="hover:text-white">Contact Us</a></li>
+                <li><Link to="/privacy" className="hover:text-white">Privacy Policy</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4">Follow Us</h3>
+              <div className="flex space-x-4">
+                <Facebook className="text-gray-400 hover:text-white cursor-pointer" size={24} />
+                <Instagram className="text-gray-400 hover:text-white cursor-pointer" size={24} />
+                <Twitter className="text-gray-400 hover:text-white cursor-pointer" size={24} />
+                <Youtube className="text-gray-400 hover:text-white cursor-pointer" size={24} />
               </div>
             </div>
+          </div>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2024 CodeWave. All rights reserved.</p>
           </div>
         </div>
       </footer>
