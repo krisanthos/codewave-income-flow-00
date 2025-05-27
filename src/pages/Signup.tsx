@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import { initiateRegistrationPayment, completeRegistrationAfterPayment, hasPendingRegistration, TEST_MODE } from "../utils/payments";
+import { supabase } from "@/integrations/supabase/client";
 
 const Signup = () => {
   const [step, setStep] = useState(1);
@@ -34,12 +35,65 @@ const Signup = () => {
         
         const result = await completeRegistrationAfterPayment();
         
-        if (result.success) {
-          toast({
-            title: "Registration successful!",
-            description: "Your account has been created and you are now logged in.",
-          });
-          navigate('/dashboard');
+        if (result.success && result.userData) {
+          // Register user with Supabase
+          try {
+            const { data, error } = await supabase.auth.signUp({
+              email: result.userData.email,
+              password: result.userData.password,
+              options: {
+                data: {
+                  full_name: result.userData.fullName,
+                  phone: result.userData.phoneNumber,
+                }
+              }
+            });
+
+            if (error) throw error;
+
+            if (data.user) {
+              // Create profile with registration fee payment
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  full_name: result.userData.fullName,
+                  email: result.userData.email,
+                  balance: 2000, // ₦2,000 welcome bonus after ₦5,000 payment
+                  total_earned: 0,
+                  registration_fee_paid: true,
+                });
+
+              if (profileError) throw profileError;
+
+              // Create registration transaction
+              const { error: transactionError } = await supabase
+                .from('transactions')
+                .insert({
+                  user_id: data.user.id,
+                  type: 'registration_bonus',
+                  amount: 2000,
+                  status: 'completed',
+                  description: 'Welcome bonus after registration payment',
+                  currency: 'NGN',
+                });
+
+              if (transactionError) throw transactionError;
+
+              toast({
+                title: "Registration successful!",
+                description: "Welcome to CodeWave! ₦2,000 has been credited to your account.",
+              });
+
+              navigate('/dashboard');
+            }
+          } catch (error: any) {
+            toast({
+              title: "Registration failed",
+              description: error.message,
+              variant: "destructive",
+            });
+          }
         } else {
           toast({
             title: "Registration failed",
@@ -78,44 +132,7 @@ const Signup = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // Instead of making direct API call here, we'll store user data and initiate payment
-      initiateRegistrationPayment({
-        fullName: formData.fullName,
-        username: formData.username,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        password: formData.password,
-      });
-      
-      if (TEST_MODE) {
-        toast({
-          title: "Test Mode Active",
-          description: "Registration processed in test mode - no actual payment required.",
-        });
-      } else {
-        toast({
-          title: "Payment initiated",
-          description: "Please complete the payment process to finish registration.",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Registration process failed",
-        description: error instanceof Error ? error.message : "There was a problem initiating the registration process.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handlePaystackPayment = () => {
-    // Use the updated function with user data
     initiateRegistrationPayment({
       fullName: formData.fullName,
       username: formData.username,
@@ -123,40 +140,47 @@ const Signup = () => {
       phoneNumber: formData.phoneNumber,
       password: formData.password,
     });
+
+    if (TEST_MODE) {
+      toast({
+        title: "Test Mode Active",
+        description: "Registration processed in test mode - no actual payment required.",
+      });
+    } else {
+      toast({
+        title: "Payment initiated",
+        description: "Please complete the payment process to finish registration.",
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Link to="/" className="flex items-center justify-center text-gray-600 hover:text-gray-900">
+          <Link to="/" className="flex items-center justify-center text-gray-600 hover:text-gray-900 mb-6">
             <ArrowLeft className="mr-2" size={16} />
             Back to Home
           </Link>
           <div className="flex justify-center mb-4">
             <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-16" />
           </div>
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">Create your account</h2>
+          <h2 className="mt-2 text-center text-3xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Create your account</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link to="/auth" className="font-medium text-green-600 hover:text-green-500">
               sign in to your existing account
             </Link>
           </p>
         </div>
-        <Card>
+        <Card className="bg-white/80 backdrop-blur-md shadow-xl border-green-100">
           <CardHeader>
-            <CardTitle>{step === 1 ? "Step 1: Account Details" : "Step 2: Payment"}</CardTitle>
+            <CardTitle className="text-green-800">{step === 1 ? "Step 1: Account Details" : "Step 2: Payment"}</CardTitle>
             <CardDescription>
               {step === 1
                 ? "Fill in your personal information"
-                : "Complete registration with payment"}
+                : "Complete registration with ₦5,000 payment"}
             </CardDescription>
-            {TEST_MODE && (
-              <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
-                Test Mode Active - No actual payment will be processed
-              </div>
-            )}
           </CardHeader>
           {step === 1 ? (
             <form onSubmit={handleNextStep}>
@@ -169,6 +193,7 @@ const Signup = () => {
                     value={formData.fullName}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -179,6 +204,7 @@ const Signup = () => {
                     value={formData.username}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -190,6 +216,7 @@ const Signup = () => {
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -201,6 +228,7 @@ const Signup = () => {
                     value={formData.phoneNumber}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -212,6 +240,7 @@ const Signup = () => {
                     value={formData.password}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -223,59 +252,53 @@ const Signup = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     required
+                    className="border-green-200 focus:border-green-500"
                   />
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
                   Continue to Payment
                 </Button>
               </CardFooter>
             </form>
           ) : (
-            <form onSubmit={handleSubmit}>
+            <div>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                  <p className="text-sm text-green-800">
                     Registration fee: ₦5,000 
                     <br />
-                    (₦2,500 will be credited to your account after registration)
-                    {TEST_MODE && <span className="font-semibold"><br />Test mode: No payment required</span>}
+                    (₦2,000 will be credited to your account after registration)
                   </p>
                 </div>
                 
-                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm text-green-800 font-medium">
-                    {TEST_MODE 
-                      ? "Test mode active - click below to simulate payment" 
-                      : "We accept Paystack for secure and easy payments"}
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-md">
+                  <p className="text-sm text-emerald-800 font-medium">
+                    Secure payment via Paystack
                   </p>
                 </div>
                 
                 <Button 
                   type="button" 
                   onClick={handlePaystackPayment} 
-                  className={`w-full ${TEST_MODE ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-600 hover:bg-green-700'}`}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  disabled={isLoading}
                 >
-                  {TEST_MODE ? "Simulate Payment" : "Pay with Paystack"}
+                  {isLoading ? "Processing..." : "Pay ₦5,000 with Paystack"}
                 </Button>
-                <p className="text-xs text-center text-gray-500">
-                  {TEST_MODE 
-                    ? "Click the button above to simulate a successful payment" 
-                    : "Click the button above to proceed to secure payment with Paystack"}
-                </p>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-green-200 text-green-600 hover:bg-green-50"
                   onClick={() => setStep(1)}
                 >
                   Back to Details
                 </Button>
               </CardFooter>
-            </form>
+            </div>
           )}
         </Card>
       </div>

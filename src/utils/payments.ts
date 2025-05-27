@@ -3,8 +3,8 @@
  * Payment utility functions for the application
  */
 
-// Test mode flag - set to true to bypass actual payment
-export const TEST_MODE = true;
+// Test mode flag - set to false for production
+export const TEST_MODE = false;
 
 /**
  * Opens the Paystack payment page for registration payment
@@ -54,58 +54,10 @@ export const completeRegistrationAfterPayment = async () => {
 
     const parsedUserData = JSON.parse(userData);
     
-    if (TEST_MODE) {
-      console.log('TEST MODE: Creating database entry for user in test mode', parsedUserData);
-      
-      // Make an API call to register the user even in test mode
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...parsedUserData,
-          testMode: TEST_MODE // Flag to indicate this is a test mode registration
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.msg || 'Registration failed');
-      }
-      
-      // Store the token
-      localStorage.setItem('userToken', data.token);
-      
-      // Clear the stored data
-      sessionStorage.removeItem('pendingUserRegistration');
-      
-      return { success: true, token: data.token };
-    }
-    
-    // Make an API call to register the user
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(parsedUserData),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.msg || 'Registration failed');
-    }
-
     // Clear the stored data
     sessionStorage.removeItem('pendingUserRegistration');
     
-    // Store the token
-    localStorage.setItem('userToken', data.token);
-    
-    return { success: true, token: data.token };
+    return { success: true, userData: parsedUserData };
   } catch (error) {
     console.error('Error completing registration:', error);
     return { success: false, error };
