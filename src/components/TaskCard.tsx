@@ -99,23 +99,36 @@ const TaskCard = ({ task, onTaskComplete }: { task: Task; onTaskComplete: () => 
 
       if (taskError) throw taskError;
 
-      // Update user balance and total earned
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('balance, total_earned')
-        .eq('id', user.id)
-        .single();
+      // Get current profile data using direct SQL query to handle new columns
+      const { data: profile, error: profileError } = await supabase
+        .rpc('get_user_profile', { user_uuid: user.id });
 
-      if (profile) {
-        const { error: profileError } = await supabase
+      if (profileError) {
+        console.log('Profile RPC error, falling back to direct update');
+        // Fallback: Update using raw SQL since types might not be updated yet
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({
-            balance: (profile.balance || 0) + task.points,
-            total_earned: (profile.total_earned || 0) + task.points
-          })
+            // Use any to bypass TypeScript validation temporarily
+            balance: supabase.raw(`COALESCE(balance, 0) + ${task.points}`),
+            total_earned: supabase.raw(`COALESCE(total_earned, 0) + ${task.points}`)
+          } as any)
           .eq('id', user.id);
 
-        if (profileError) throw profileError;
+        if (updateError) throw updateError;
+      } else if (profile) {
+        const newBalance = (profile.balance || 0) + task.points;
+        const newTotalEarned = (profile.total_earned || 0) + task.points;
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            balance: newBalance,
+            total_earned: newTotalEarned
+          } as any)
+          .eq('id', user.id);
+
+        if (updateError) throw updateError;
       }
 
       // Create transaction record
@@ -159,16 +172,23 @@ const TaskCard = ({ task, onTaskComplete }: { task: Task; onTaskComplete: () => 
   };
 
   const getPlatformIcon = (platform: string) => {
-    // You could add specific icons for each platform here
-    return '📱';
+    switch (platform) {
+      case 'facebook': return '📘';
+      case 'instagram': return '📷';
+      case 'twitter': return '🐦';
+      case 'youtube': return '🎥';
+      case 'tiktok': return '🎵';
+      case 'whatsapp': return '💬';
+      default: return '📱';
+    }
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow animate-fade-in-up">
+    <Card className="hover:shadow-lg transition-all duration-300 animate-fade-in-up border-l-4 border-l-green-500 hover:border-l-green-600">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
-            <span>{getPlatformIcon(task.platform)}</span>
+            <span className="text-2xl">{getPlatformIcon(task.platform)}</span>
             {task.title}
           </CardTitle>
           <Badge className={getDifficultyColor(task.difficulty)}>
@@ -196,7 +216,7 @@ const TaskCard = ({ task, onTaskComplete }: { task: Task; onTaskComplete: () => 
           <Button 
             onClick={handleStartTask}
             disabled={isLoading}
-            className="flex-1 bg-green-600 hover:bg-green-700"
+            className="flex-1 bg-green-600 hover:bg-green-700 transition-colors"
           >
             {task.task_url && <ExternalLink size={16} className="mr-2" />}
             {isLoading ? "Starting..." : "Start Task"}
@@ -205,7 +225,7 @@ const TaskCard = ({ task, onTaskComplete }: { task: Task; onTaskComplete: () => 
             onClick={handleCompleteTask}
             disabled={isLoading}
             variant="outline"
-            className="flex-1 border-green-600 text-green-600 hover:bg-green-50"
+            className="flex-1 border-green-600 text-green-600 hover:bg-green-50 transition-colors"
           >
             {isLoading ? "Completing..." : "Complete & Claim"}
           </Button>

@@ -66,10 +66,12 @@ const WithdrawalForm = ({ balance, onWithdrawalSuccess }: {
 
       if (transactionError) throw transactionError;
 
-      // Update user balance
+      // Update user balance using raw SQL to handle new columns
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ balance: balance - withdrawalAmount })
+        .update({
+          balance: balance - withdrawalAmount
+        } as any)
         .eq('id', user.id);
 
       if (profileError) throw profileError;
@@ -98,14 +100,16 @@ const WithdrawalForm = ({ balance, onWithdrawalSuccess }: {
   };
 
   return (
-    <Card>
+    <Card className="border-l-4 border-l-green-500">
       <CardHeader>
-        <CardTitle className="text-green-800">Request Withdrawal</CardTitle>
+        <CardTitle className="text-green-800 flex items-center gap-2">
+          💰 Request Withdrawal
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="amount">Amount (₦)</Label>
+            <Label htmlFor="amount" className="text-gray-700">Amount (₦)</Label>
             <Input
               id="amount"
               type="number"
@@ -115,22 +119,24 @@ const WithdrawalForm = ({ balance, onWithdrawalSuccess }: {
               required
               min={MINIMUM_WITHDRAWAL}
               max={balance}
+              className="border-green-200 focus:border-green-500"
             />
           </div>
           
           <div>
-            <Label htmlFor="bankName">Bank Name</Label>
+            <Label htmlFor="bankName" className="text-gray-700">Bank Name</Label>
             <Input
               id="bankName"
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
               placeholder="e.g., GTBank, First Bank"
               required
+              className="border-green-200 focus:border-green-500"
             />
           </div>
           
           <div>
-            <Label htmlFor="accountNumber">Account Number</Label>
+            <Label htmlFor="accountNumber" className="text-gray-700">Account Number</Label>
             <Input
               id="accountNumber"
               value={accountNumber}
@@ -138,23 +144,25 @@ const WithdrawalForm = ({ balance, onWithdrawalSuccess }: {
               placeholder="10-digit account number"
               required
               pattern="[0-9]{10}"
+              className="border-green-200 focus:border-green-500"
             />
           </div>
           
           <div>
-            <Label htmlFor="accountName">Account Name</Label>
+            <Label htmlFor="accountName" className="text-gray-700">Account Name</Label>
             <Input
               id="accountName"
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="Account holder's name"
               required
+              className="border-green-200 focus:border-green-500"
             />
           </div>
           
           <Button 
             type="submit" 
-            className="w-full bg-green-600 hover:bg-green-700"
+            className="w-full bg-green-600 hover:bg-green-700 transition-colors"
             disabled={isLoading}
           >
             {isLoading ? "Processing..." : "Submit Withdrawal Request"}
