@@ -1,37 +1,16 @@
 
 /**
  * Payment utility functions for the application
+ * Now integrated with Supabase for user management
  */
+
+import { supabase } from "@/integrations/supabase/client";
 
 // Test mode flag - set to false for production
 export const TEST_MODE = true;
 
 /**
- * Opens the Paystack payment page for registration payment
- * @param userData User registration data to pass through the URL
- */
-export const initiateRegistrationPayment = (userData: {
-  fullName: string;
-  username: string;
-  email: string;
-  phoneNumber: string;
-  password: string;
-}) => {
-  // Store user data in sessionStorage for retrieval after payment completion
-  sessionStorage.setItem('pendingUserRegistration', JSON.stringify(userData));
-  
-  if (TEST_MODE) {
-    console.log('TEST MODE: Bypassing payment and simulating successful registration');
-    // Simulate successful payment by redirecting to the success URL
-    window.location.href = window.location.origin + '?payment_success=true';
-    return;
-  }
-  
-  window.open('https://paystack.shop/pay/cjq84w--6d', '_blank');
-};
-
-/**
- * Opens the Paystack payment page for subsequent payments
+ * Opens the Paystack payment page for subsequent payments (withdrawals, etc.)
  */
 export const initiateSubsequentPayment = () => {
   if (TEST_MODE) {
@@ -42,32 +21,103 @@ export const initiateSubsequentPayment = () => {
 };
 
 /**
- * Completes the registration process after payment
- * @returns Promise that resolves to the registration result
+ * Processes a withdrawal request
+ * @param amount Amount to withdraw
+ * @param accountDetails Bank account details
  */
-export const completeRegistrationAfterPayment = async () => {
+export const processWithdrawal = async (amount: number, accountDetails: any) => {
   try {
-    const userData = sessionStorage.getItem('pendingUserRegistration');
-    if (!userData) {
-      throw new Error('No pending registration data found');
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
-    const parsedUserData = JSON.parse(userData);
-    
-    // Clear the stored data
-    sessionStorage.removeItem('pendingUserRegistration');
-    
-    return { success: true, userData: parsedUserData };
+    // Get user profile to check balance
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('balance')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) throw profileError;
+
+    if (!profile || profile.balance < amount) {
+      throw new Error('Insufficient balance');
+    }
+
+    // Create withdrawal transaction
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        type: 'withdrawal',
+        amount: -amount,
+        status: 'pending',
+        description: `Withdrawal to ${accountDetails.bankName} - ${accountDetails.accountNumber}`,
+        currency: 'NGN',
+        metadata: accountDetails
+      });
+
+    if (transactionError) throw transactionError;
+
+    // Update user balance
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ balance: profile.balance - amount })
+      .eq('id', user.id);
+
+    if (updateError) throw updateError;
+
+    return { success: true };
   } catch (error) {
-    console.error('Error completing registration:', error);
+    console.error('Withdrawal error:', error);
     return { success: false, error };
   }
 };
 
 /**
- * Checks if there's a pending registration to complete
- * @returns boolean indicating if there's pending registration data
+ * Gets user balance from Supabase
  */
+export const getUserBalance = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('balance, total_earned')
+      .eq('id', user.id)
+      .single();
+
+    if (error) throw error;
+
+    return { 
+      success: true, 
+      balance: profile?.balance || 0,
+      totalEarned: profile?.total_earned || 0
+    };
+  } catch (error) {
+    console.error('Get balance error:', error);
+    return { success: false, error };
+  }
+};
+
+/**
+ * Legacy functions - kept for compatibility but now handled by Supabase
+ */
+export const initiateRegistrationPayment = () => {
+  console.log('Registration now handled directly through Supabase Auth');
+};
+
+export const completeRegistrationAfterPayment = () => {
+  console.log('Registration completion now handled by Supabase trigger');
+  return { success: true };
+};
+
 export const hasPendingRegistration = () => {
-  return !!sessionStorage.getItem('pendingUserRegistration');
+  return false; // No longer needed with Supabase
 };

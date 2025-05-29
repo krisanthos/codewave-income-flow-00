@@ -1,113 +1,38 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft } from "lucide-react";
-import { initiateRegistrationPayment, completeRegistrationAfterPayment, hasPendingRegistration, TEST_MODE } from "../utils/payments";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { isValidPhoneNumber } from 'react-phone-number-input';
 
 const Signup = () => {
-  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     fullName: "",
-    username: "",
     email: "",
     phoneNumber: "",
     password: "",
     confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
-  // Check for payment success from URL query params
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const paymentSuccess = queryParams.get('payment_success');
-    
-    const checkPendingRegistration = async () => {
-      if (paymentSuccess === 'true' || hasPendingRegistration()) {
-        setIsLoading(true);
-        
-        const result = await completeRegistrationAfterPayment();
-        
-        if (result.success && result.userData) {
-          // Register user with Supabase
-          try {
-            const { data, error } = await supabase.auth.signUp({
-              email: result.userData.email,
-              password: result.userData.password,
-              options: {
-                data: {
-                  full_name: result.userData.fullName,
-                  phone: result.userData.phoneNumber,
-                }
-              }
-            });
-
-            if (error) throw error;
-
-            if (data.user) {
-              // Create profile with registration fee payment
-              const { error: profileError } = await supabase
-                .from('profiles')
-                .insert({
-                  id: data.user.id,
-                  full_name: result.userData.fullName,
-                  email: result.userData.email,
-                  balance: 2000, // ₦2,000 welcome bonus after ₦5,000 payment
-                  total_earned: 0,
-                  registration_fee_paid: true,
-                });
-
-              if (profileError) throw profileError;
-
-              // Create registration transaction
-              const { error: transactionError } = await supabase
-                .from('transactions')
-                .insert({
-                  user_id: data.user.id,
-                  type: 'registration_bonus',
-                  amount: 2000,
-                  status: 'completed',
-                  description: 'Welcome bonus after registration payment',
-                  currency: 'NGN',
-                });
-
-              if (transactionError) throw transactionError;
-
-              toast({
-                title: "Registration successful!",
-                description: "Welcome to CodeWave! ₦2,000 has been credited to your account.",
-              });
-
-              navigate('/dashboard');
-            }
-          } catch (error: any) {
-            toast({
-              title: "Registration failed",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
-        } else {
-          toast({
-            title: "Registration failed",
-            description: "There was a problem creating your account.",
-            variant: "destructive",
-          });
-        }
-        
-        setIsLoading(false);
+    // Check if user is already logged in
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard');
       }
     };
-    
-    checkPendingRegistration();
-  }, [location, navigate]);
+    checkAuth();
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -122,35 +47,79 @@ const Signup = () => {
       });
       return false;
     }
+
+    if (!formData.phoneNumber || !isValidPhoneNumber(formData.phoneNumber)) {
+      toast({
+        title: "Invalid phone number",
+        description: "Please enter a valid phone number with country code.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     return true;
   };
 
-  const handleNextStep = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      setStep(2);
-    }
-  };
+    
+    if (!validateForm()) return;
 
-  const handlePaystackPayment = () => {
-    initiateRegistrationPayment({
-      fullName: formData.fullName,
-      username: formData.username,
-      email: formData.email,
-      phoneNumber: formData.phoneNumber,
-      password: formData.password,
-    });
+    setIsLoading(true);
 
-    if (TEST_MODE) {
-      toast({
-        title: "Test Mode Active",
-        description: "Registration processed in test mode - no actual payment required.",
+    try {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', formData.email)
+        .single();
+
+      if (existingUser) {
+        throw new Error('An account with this email already exists');
+      }
+
+      // Check if phone number already exists
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('phone', formData.phoneNumber)
+        .single();
+
+      if (existingPhone) {
+        throw new Error('An account with this phone number already exists');
+      }
+
+      // Create the user account
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            phone: formData.phoneNumber,
+          }
+        }
       });
-    } else {
+
+      if (error) throw error;
+
+      if (data.user) {
+        toast({
+          title: "Registration successful!",
+          description: "Welcome to CodeWave! ₦2,500 has been credited to your account.",
+        });
+
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
       toast({
-        title: "Payment initiated",
-        description: "Please complete the payment process to finish registration.",
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -175,131 +144,94 @@ const Signup = () => {
         </div>
         <Card className="bg-white/80 backdrop-blur-md shadow-xl border-green-100">
           <CardHeader>
-            <CardTitle className="text-green-800">{step === 1 ? "Step 1: Account Details" : "Step 2: Payment"}</CardTitle>
+            <CardTitle className="text-green-800">Join CodeWave</CardTitle>
             <CardDescription>
-              {step === 1
-                ? "Fill in your personal information"
-                : "Complete registration with ₦5,000 payment"}
+              Create your account and start earning instantly
             </CardDescription>
+            <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
+              <p className="text-sm text-green-800 font-medium">
+                🎉 Get ₦2,500 welcome bonus instantly!
+              </p>
+            </div>
           </CardHeader>
-          {step === 1 ? (
-            <form onSubmit={handleNextStep}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    required
-                    className="border-green-200 focus:border-green-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    required
-                    className="border-green-200 focus:border-green-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="border-green-200 focus:border-green-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    name="phoneNumber"
-                    type="tel"
-                    value={formData.phoneNumber}
-                    onChange={handleChange}
-                    required
-                    className="border-green-200 focus:border-green-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                  className="border-green-200 focus:border-green-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="border-green-200 focus:border-green-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <PhoneInput
+                  value={formData.phoneNumber}
+                  onChange={(value) => setFormData({ ...formData, phoneNumber: value || "" })}
+                  placeholder="Enter phone number"
+                  className="border-green-200 focus:border-green-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
                   <Input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    className="border-green-200 focus:border-green-500"
+                    className="border-green-200 focus:border-green-500 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                    className="border-green-200 focus:border-green-500"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                  Continue to Payment
-                </Button>
-              </CardFooter>
-            </form>
-          ) : (
-            <div>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm text-green-800">
-                    Registration fee: ₦5,000 
-                    <br />
-                    (₦2,000 will be credited to your account after registration)
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-md">
-                  <p className="text-sm text-emerald-800 font-medium">
-                    Secure payment via Paystack
-                  </p>
-                </div>
-                
-                <Button 
-                  type="button" 
-                  onClick={handlePaystackPayment} 
-                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Processing..." : "Pay ₦5,000 with Paystack"}
-                </Button>
-              </CardContent>
-              <CardFooter className="flex flex-col space-y-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-green-200 text-green-600 hover:bg-green-50"
-                  onClick={() => setStep(1)}
-                >
-                  Back to Details
-                </Button>
-              </CardFooter>
-            </div>
-          )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  className="border-green-200 focus:border-green-500"
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                disabled={isLoading}
+              >
+                {isLoading ? "Creating account..." : "Create Account & Get ₦2,500 Free"}
+              </Button>
+            </CardFooter>
+          </form>
         </Card>
       </div>
     </div>

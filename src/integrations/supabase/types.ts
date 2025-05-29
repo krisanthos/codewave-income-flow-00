@@ -12,26 +12,38 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          balance: number | null
           created_at: string | null
           email: string | null
           full_name: string | null
           id: string
+          phone: string | null
+          registration_fee_paid: boolean | null
+          total_earned: number | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
+          balance?: number | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          phone?: string | null
+          registration_fee_paid?: boolean | null
+          total_earned?: number | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
+          balance?: number | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          phone?: string | null
+          registration_fee_paid?: boolean | null
+          total_earned?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -42,10 +54,14 @@ export type Database = {
           created_at: string | null
           description: string | null
           difficulty: string
+          estimated_time_minutes: number | null
           id: string
           is_active: boolean | null
+          platform: string | null
           points: number
           requirements: string[] | null
+          task_type: string | null
+          task_url: string | null
           time_estimate: number | null
           title: string
           updated_at: string | null
@@ -55,10 +71,14 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           difficulty: string
+          estimated_time_minutes?: number | null
           id?: string
           is_active?: boolean | null
+          platform?: string | null
           points?: number
           requirements?: string[] | null
+          task_type?: string | null
+          task_url?: string | null
           time_estimate?: number | null
           title: string
           updated_at?: string | null
@@ -68,10 +88,14 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           difficulty?: string
+          estimated_time_minutes?: number | null
           id?: string
           is_active?: boolean | null
+          platform?: string | null
           points?: number
           requirements?: string[] | null
+          task_type?: string | null
+          task_url?: string | null
           time_estimate?: number | null
           title?: string
           updated_at?: string | null

@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { isValidPhoneNumber } from 'react-phone-number-input';
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -75,9 +77,40 @@ const Auth = () => {
       return;
     }
 
+    if (!signupData.phone || !isValidPhoneNumber(signupData.phone)) {
+      toast({
+        title: "Invalid phone number",
+        description: "Please enter a valid phone number with country code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', signupData.email)
+        .single();
+
+      if (existingUser) {
+        throw new Error('An account with this email already exists');
+      }
+
+      // Check if phone number already exists
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('phone', signupData.phone)
+        .single();
+
+      if (existingPhone) {
+        throw new Error('An account with this phone number already exists');
+      }
+
       // Create the user account
       const { data, error } = await supabase.auth.signUp({
         email: signupData.email,
@@ -93,34 +126,6 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Create profile with registration fee payment
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            full_name: signupData.full_name,
-            phone: signupData.phone,
-            balance: 2500, // ₦2,500 welcome bonus
-            total_earned: 0,
-            registration_fee_paid: true,
-          });
-
-        if (profileError) throw profileError;
-
-        // Create registration transaction
-        const { error: transactionError } = await supabase
-          .from('transactions')
-          .insert({
-            user_id: data.user.id,
-            type: 'registration_bonus',
-            amount: 2500,
-            status: 'completed',
-            description: 'Welcome bonus for new registration',
-            currency: 'NGN',
-          });
-
-        if (transactionError) throw transactionError;
-
         toast({
           title: "Registration successful!",
           description: "Welcome to CodeWave! ₦2,500 has been credited to your account.",
@@ -253,12 +258,10 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
+                    <PhoneInput
                       value={signupData.phone}
-                      onChange={(e) => setSignupData({ ...signupData, phone: e.target.value })}
-                      required
+                      onChange={(value) => setSignupData({ ...signupData, phone: value || "" })}
+                      placeholder="Enter phone number"
                       className="border-green-200 focus:border-green-500"
                     />
                   </div>
