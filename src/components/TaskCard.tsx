@@ -99,36 +99,33 @@ const TaskCard = ({ task, onTaskComplete }: { task: Task; onTaskComplete: () => 
 
       if (taskError) throw taskError;
 
-      // Get current profile data using direct SQL query to handle new columns
+      // Get current profile data
       const { data: profile, error: profileError } = await supabase
-        .rpc('get_user_profile', { user_uuid: user.id });
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
       if (profileError) {
-        console.log('Profile RPC error, falling back to direct update');
-        // Fallback: Update using raw SQL since types might not be updated yet
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            // Use any to bypass TypeScript validation temporarily
-            balance: supabase.raw(`COALESCE(balance, 0) + ${task.points}`),
-            total_earned: supabase.raw(`COALESCE(total_earned, 0) + ${task.points}`)
-          } as any)
-          .eq('id', user.id);
+        console.error('Profile fetch error:', profileError);
+        throw profileError;
+      }
 
-        if (updateError) throw updateError;
-      } else if (profile) {
-        const newBalance = (profile.balance || 0) + task.points;
-        const newTotalEarned = (profile.total_earned || 0) + task.points;
+      // Update user balance - handle missing columns gracefully
+      const currentBalance = (profile as any)?.balance || 0;
+      const currentTotalEarned = (profile as any)?.total_earned || 0;
 
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            balance: newBalance,
-            total_earned: newTotalEarned
-          } as any)
-          .eq('id', user.id);
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          balance: currentBalance + task.points,
+          total_earned: currentTotalEarned + task.points
+        } as any)
+        .eq('id', user.id);
 
-        if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Profile update error:', updateError);
+        throw updateError;
       }
 
       // Create transaction record
