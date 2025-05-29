@@ -4,7 +4,7 @@
  */
 
 // Test mode flag - set to false for production
-export const TEST_MODE = false;
+export const TEST_MODE = true;
 
 /**
  * Opens the Paystack payment page for registration payment
