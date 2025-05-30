@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -5,125 +6,111 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Menu, X, ArrowRight, User, BarChart, LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-interface UserData {
-  username: string;
-  fullName: string;
-  balance: number;
-  email: string;
-  phoneNumber: string;
-  joinedDate: string;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Transaction {
   id: string;
   type: string;
   amount: number;
-  date: string;
+  created_at: string;
   status: string;
+  description: string;
 }
 
 interface Task {
   id: string;
   title: string;
-  reward: number;
-  duration: string;
-  completed: boolean;
+  points: number;
+  estimated_time_minutes: number;
+  platform: string;
+  difficulty: string;
 }
 
 const Dashboard = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [userData, setUserData] = useState<UserData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const token = localStorage.getItem("userToken");
-    if (!token) {
+    if (!user) {
       navigate("/login");
       return;
     }
 
-    const fetchUserData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        // Fetch user data
-        const userResponse = await fetch("/api/users/me", {
-          headers: {
-            "x-auth-token": token,
-          },
-        });
-        
-        if (!userResponse.ok) {
-          throw new Error("Failed to fetch user data");
+        // Fetch all data in parallel for better performance
+        const [profileResult, transactionsResult, tasksResult] = await Promise.all([
+          // Get user profile
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single(),
+          
+          // Get recent transactions
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10),
+          
+          // Get available tasks
+          supabase
+            .from('tasks')
+            .select('*')
+            .eq('is_active', true)
+            .limit(10)
+        ]);
+
+        if (profileResult.error) {
+          console.error("Profile fetch error:", profileResult.error);
+          // Create profile if it doesn't exist
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || 'New User',
+              phone: user.user_metadata?.phone,
+              balance: 2500,
+              total_earned: 0,
+              registration_fee_paid: true
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw createError;
+          }
+          setUserProfile(newProfile);
+        } else {
+          setUserProfile(profileResult.data);
         }
-        
-        const userData = await userResponse.json();
-        
-        // Format the user data
-        setUserData({
-          username: userData.username,
-          fullName: userData.fullName,
-          balance: userData.balance,
-          email: userData.email,
-          phoneNumber: userData.phoneNumber,
-          joinedDate: new Date(userData.registrationDate).toLocaleDateString(),
-        });
-        
-        // Fetch transactions
-        const transactionsResponse = await fetch("/api/users/transactions", {
-          headers: {
-            "x-auth-token": token,
-          },
-        });
-        
-        if (!transactionsResponse.ok) {
-          throw new Error("Failed to fetch transactions");
+
+        if (transactionsResult.error) {
+          console.error("Transactions fetch error:", transactionsResult.error);
+        } else {
+          setTransactions(transactionsResult.data || []);
         }
-        
-        const transactionsData = await transactionsResponse.json();
-        
-        // Format transactions
-        setTransactions(
-          transactionsData.map((transaction: any) => ({
-            id: transaction._id,
-            type: transaction.type,
-            amount: transaction.amount,
-            date: new Date(transaction.createdAt).toLocaleDateString(),
-            status: transaction.status,
-          }))
-        );
-        
-        // Fetch tasks
-        const tasksResponse = await fetch("/api/users/tasks", {
-          headers: {
-            "x-auth-token": token,
-          },
-        });
-        
-        if (!tasksResponse.ok) {
-          throw new Error("Failed to fetch tasks");
+
+        if (tasksResult.error) {
+          console.error("Tasks fetch error:", tasksResult.error);
+        } else {
+          setTasks(tasksResult.data || []);
         }
-        
-        const tasksData = await tasksResponse.json();
-        
-        // Format tasks
-        setTasks(
-          tasksData.map((task: any) => ({
-            id: task._id,
-            title: task.title,
-            reward: task.reward,
-            duration: `${task.estimatedMinutes} min`,
-            completed: false,
-          }))
-        );
-      } catch (error) {
-        console.error("Error fetching data:", error);
+
+      } catch (error: any) {
+        console.error("Error fetching dashboard data:", error);
         toast({
           title: "Error",
-          description: "Failed to load dashboard data",
+          description: "Failed to load dashboard data. Please refresh the page.",
           variant: "destructive",
         });
       } finally {
@@ -131,60 +118,97 @@ const Dashboard = () => {
       }
     };
 
-    fetchUserData();
-  }, [navigate]);
+    fetchDashboardData();
+  }, [user, navigate]);
 
   const handleTaskCompletion = async (taskId: string) => {
-    const token = localStorage.getItem("userToken");
-    if (!token) return;
+    if (!user || !userProfile) return;
 
     try {
-      const response = await fetch(`/api/users/complete-task/${taskId}`, {
-        method: "POST",
-        headers: {
-          "x-auth-token": token,
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to complete task");
-      }
-      
-      const data = await response.json();
-      
-      // Update tasks
-      setTasks(
-        tasks.map(task => 
-          task.id === taskId ? { ...task, completed: true } : task
-        )
-      );
-      
-      // Update user balance
-      if (userData) {
-        setUserData({
-          ...userData,
-          balance: data.balance,
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      // Check if user has already started this task
+      const { data: existingTask } = await supabase
+        .from('user_tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('task_id', taskId)
+        .single();
+
+      if (existingTask) {
+        toast({
+          title: "Task already started",
+          description: "You have already started this task",
+          variant: "destructive",
         });
+        return;
       }
-      
+
+      // Create user task entry and complete it
+      const { error: taskError } = await supabase
+        .from('user_tasks')
+        .insert({
+          user_id: user.id,
+          task_id: taskId,
+          status: 'completed',
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          points_earned: task.points
+        });
+
+      if (taskError) throw taskError;
+
+      // Update user balance
+      const newBalance = (userProfile.balance || 0) + task.points;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          balance: newBalance,
+          total_earned: (userProfile.total_earned || 0) + task.points
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'task_reward',
+          amount: task.points,
+          status: 'completed',
+          description: `Reward for completing: ${task.title}`,
+          currency: 'NGN'
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update local state
+      setUserProfile(prev => ({
+        ...prev,
+        balance: newBalance,
+        total_earned: (prev.total_earned || 0) + task.points
+      }));
+
       toast({
-        title: "Task completed",
-        description: "You have earned a reward for completing this task",
+        title: "Task completed!",
+        description: `₦${task.points} has been added to your wallet`,
       });
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("Error completing task:", error);
       toast({
         title: "Error",
-        description: "Failed to complete task",
+        description: "Failed to complete task. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("userToken");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/");
   };
 
@@ -194,16 +218,31 @@ const Dashboard = () => {
 
   // Calculate daily bonus based on balance (5% daily)
   const calculateDailyBonus = (balance: number) => {
-    return Math.round(balance * 0.05); // 5% of balance
+    return Math.round(balance * 0.05);
   };
 
   // Show loading state
-  if (isLoading || !userData) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
           <h2 className="text-xl font-semibold text-gray-700">Loading your dashboard...</h2>
           <p className="text-gray-500 mt-2">Please wait while we fetch your data</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700">Unable to load profile</h2>
+          <p className="text-gray-500 mt-2">Please try refreshing the page</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Refresh Page
+          </Button>
         </div>
       </div>
     );
@@ -217,15 +256,15 @@ const Dashboard = () => {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/dashboard" className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-blue-600">CodeWave</span>
+                <span className="text-2xl font-bold text-green-600">CodeWave</span>
               </Link>
             </div>
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
               <span className="text-gray-700 px-3 py-2 rounded-md text-sm font-medium">
-                Welcome, {userData.username}!
+                Welcome, {userProfile.full_name || 'User'}!
               </span>
-              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                ₦{userData.balance.toLocaleString()}
+              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                ₦{(userProfile.balance || 0).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center md:hidden">
@@ -244,23 +283,11 @@ const Dashboard = () => {
           <div className="md:hidden">
             <div className="pt-2 pb-3 space-y-1">
               <div className="block px-3 py-2 rounded-md text-base font-medium text-gray-700">
-                Welcome, {userData.username}!
+                Welcome, {userProfile.full_name || 'User'}!
               </div>
-              <div className="block px-3 py-2 rounded-md text-base font-medium bg-blue-100 text-blue-800 mx-3">
-                ₦{userData.balance.toLocaleString()}
+              <div className="block px-3 py-2 rounded-md text-base font-medium bg-green-100 text-green-800 mx-3">
+                ₦{(userProfile.balance || 0).toLocaleString()}
               </div>
-              <Link to="/tasks" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Tasks
-              </Link>
-              <Link to="/withdraw" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Withdraw
-              </Link>
-              <Link to="/deposit" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Deposit
-              </Link>
-              <Link to="/support" onClick={toggleMenu} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                Support
-              </Link>
               <button 
                 onClick={handleLogout}
                 className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
@@ -283,25 +310,9 @@ const Dashboard = () => {
                   <BarChart className="mr-3" size={20} />
                   Dashboard
                 </Link>
-                <Link to="/tasks" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
-                  <ArrowRight className="mr-3" size={20} />
-                  Tasks
-                </Link>
-                <Link to="/withdraw" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
-                  <ArrowRight className="mr-3" size={20} />
-                  Withdraw
-                </Link>
-                <Link to="/deposit" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
-                  <ArrowRight className="mr-3" size={20} />
-                  Deposit
-                </Link>
                 <Link to="/profile" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
                   <User className="mr-3" size={20} />
                   Profile
-                </Link>
-                <Link to="/support" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
-                  <ArrowRight className="mr-3" size={20} />
-                  Support
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -326,8 +337,8 @@ const Dashboard = () => {
                   <CardTitle className="text-sm font-medium text-gray-500">Current Balance</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">₦{userData.balance.toLocaleString()}</div>
-                  <p className="text-xs text-green-600 mt-1">+₦{calculateDailyBonus(userData.balance)} daily bonus</p>
+                  <div className="text-2xl font-bold">₦{(userProfile.balance || 0).toLocaleString()}</div>
+                  <p className="text-xs text-green-600 mt-1">+₦{calculateDailyBonus(userProfile.balance || 0)} daily bonus</p>
                 </CardContent>
               </Card>
               <Card>
@@ -341,16 +352,17 @@ const Dashboard = () => {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-500">Member Since</CardTitle>
+                  <CardTitle className="text-sm font-medium text-gray-500">Total Earned</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{userData.joinedDate}</div>
+                  <div className="text-2xl font-bold">₦{(userProfile.total_earned || 0).toLocaleString()}</div>
+                  <p className="text-xs text-gray-600 mt-1">Lifetime earnings</p>
                 </CardContent>
               </Card>
             </div>
 
             <div className="mt-8">
-              <Tabs defaultValue="overview" className="w-full" onValueChange={setActiveTab}>
+              <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="tasks">Available Tasks</TabsTrigger>
@@ -366,27 +378,23 @@ const Dashboard = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                        <p className="text-sm text-blue-800">
+                      <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                        <p className="text-sm text-green-800">
                           Complete more tasks to increase your balance and earn higher daily bonuses!
                         </p>
                       </div>
                       
                       <div className="mt-6">
-                        <h3 className="font-medium text-gray-900">Quick Actions</h3>
-                        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <Link to="/tasks">
-                            <Button variant="outline" className="w-full justify-start">
-                              <ArrowRight className="mr-2" size={16} />
-                              Find Tasks
-                            </Button>
-                          </Link>
-                          <Link to="/deposit">
-                            <Button variant="outline" className="w-full justify-start">
-                              <ArrowRight className="mr-2" size={16} />
-                              Deposit Funds
-                            </Button>
-                          </Link>
+                        <h3 className="font-medium text-gray-900">Available Task Types</h3>
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <h4 className="font-medium text-blue-800">Watch Ads</h4>
+                            <p className="text-sm text-blue-600">Earn 45-100 points per ad</p>
+                          </div>
+                          <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                            <h4 className="font-medium text-purple-800">Social Media</h4>
+                            <p className="text-sm text-purple-600">Like, share, and follow</p>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -406,21 +414,21 @@ const Dashboard = () => {
                         {tasks.length > 0 ? (
                           tasks.map((task) => (
                             <div key={task.id} className="py-4">
-                              <div className="flex justify-between">
-                                <div>
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
                                   <h4 className="font-medium text-gray-900">{task.title}</h4>
-                                  <p className="text-sm text-gray-500">Duration: {task.duration}</p>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Platform: {task.platform} • Duration: {task.estimated_time_minutes || 1} min • Difficulty: {task.difficulty}
+                                  </p>
                                 </div>
-                                <div className="text-right">
-                                  <span className="block text-green-600 font-medium">₦{task.reward}</span>
+                                <div className="text-right ml-4">
+                                  <span className="block text-green-600 font-medium text-lg">₦{task.points}</span>
                                   <Button
                                     size="sm"
-                                    className="mt-2"
-                                    variant={task.completed ? "secondary" : "default"}
-                                    disabled={task.completed}
-                                    onClick={() => !task.completed && handleTaskCompletion(task.id)}
+                                    className="mt-2 bg-green-600 hover:bg-green-700"
+                                    onClick={() => handleTaskCompletion(task.id)}
                                   >
-                                    {task.completed ? "Completed" : "Start Task"}
+                                    Complete Task
                                   </Button>
                                 </div>
                               </div>
@@ -451,10 +459,14 @@ const Dashboard = () => {
                                 <h4 className="font-medium text-gray-900">
                                   {transaction.type === 'deposit' && 'Deposit'}
                                   {transaction.type === 'withdraw' && 'Withdrawal'}
-                                  {transaction.type === 'daily_bonus' && 'Daily Bonus'}
+                                  {transaction.type === 'registration_bonus' && 'Welcome Bonus'}
                                   {transaction.type === 'task_reward' && 'Task Reward'}
+                                  {transaction.type === 'daily_bonus' && 'Daily Bonus'}
                                 </h4>
-                                <p className="text-sm text-gray-500">{transaction.date}</p>
+                                <p className="text-sm text-gray-500">{new Date(transaction.created_at).toLocaleDateString()}</p>
+                                {transaction.description && (
+                                  <p className="text-xs text-gray-400 mt-1">{transaction.description}</p>
+                                )}
                               </div>
                               <div className="text-right">
                                 <span className={`block font-medium ${

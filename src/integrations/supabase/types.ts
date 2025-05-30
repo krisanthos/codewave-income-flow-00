@@ -194,12 +194,30 @@ export type Database = {
           },
         ]
       }
+      users: {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      register_user: {
+        Args: { user_email: string; user_password: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
