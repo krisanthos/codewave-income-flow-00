@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -44,14 +43,10 @@ const Dashboard = () => {
 
     const fetchDashboardData = async () => {
       try {
-        // Fetch all data in parallel for better performance
+        // Use the security definer function to get profile data safely
         const [profileResult, transactionsResult, tasksResult] = await Promise.all([
-          // Get user profile
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single(),
+          // Get user profile using the security definer function
+          supabase.rpc('get_current_user_profile'),
           
           // Get recent transactions
           supabase
@@ -69,9 +64,13 @@ const Dashboard = () => {
             .limit(10)
         ]);
 
+        console.log("Profile result:", profileResult);
+        console.log("Transactions result:", transactionsResult);
+        console.log("Tasks result:", tasksResult);
+
         if (profileResult.error) {
           console.error("Profile fetch error:", profileResult.error);
-          // Create profile if it doesn't exist
+          // If no profile exists, create one
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
@@ -90,8 +89,28 @@ const Dashboard = () => {
             throw createError;
           }
           setUserProfile(newProfile);
+        } else if (profileResult.data && profileResult.data.length > 0) {
+          setUserProfile(profileResult.data[0]);
         } else {
-          setUserProfile(profileResult.data);
+          // Profile function returned empty, create profile
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || 'New User',
+              phone: user.user_metadata?.phone,
+              balance: 2500,
+              total_earned: 0,
+              registration_fee_paid: true
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw createError;
+          }
+          setUserProfile(newProfile);
         }
 
         if (transactionsResult.error) {

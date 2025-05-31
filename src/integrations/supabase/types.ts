@@ -214,6 +214,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_current_user_profile: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          full_name: string
+          phone: string
+          balance: number
+          total_earned: number
+          registration_fee_paid: boolean
+          avatar_url: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
       register_user: {
         Args: { user_email: string; user_password: string }
         Returns: undefined
