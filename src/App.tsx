@@ -18,6 +18,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import UserDetail from "./pages/UserDetail";
 import Profile from "./pages/Profile"; // ✌️ New profile page 💔
 import Tasks from "./pages/Tasks"; // 💔❤️‍🩹 New tasks page
+import Withdrawal from "./pages/Withdrawal"; // 💰 Withdrawal page ✌️
+import Deposit from "./pages/Deposit"; // 💸 Deposit page 🥀
+import ConfirmRegistration from "./pages/ConfirmRegistration"; // ✅ Registration confirmation 💔
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +41,9 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} /> {/* ✌️ Profile route 🥀 */}
             <Route path="/tasks" element={<Tasks />} /> {/* 💔❤️‍🩹 Tasks route */}
+            <Route path="/withdrawal" element={<Withdrawal />} /> {/* 💰 Withdrawal route ✌️ */}
+            <Route path="/deposit" element={<Deposit />} /> {/* 💸 Deposit route 🥀 */}
+            <Route path="/confirm-registration" element={<ConfirmRegistration />} /> {/* ✅ Confirmation route 💔 */}
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/admin-auth" element={<AdminAuth />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />

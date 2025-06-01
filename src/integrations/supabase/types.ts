@@ -9,6 +9,128 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at: string | null
+          id: string
+          is_verified: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at?: string | null
+          id?: string
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          created_at?: string | null
+          id?: string
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_earnings: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          deposit_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date?: string
+          deposit_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          deposit_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_earnings_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "deposits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deposits: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          net_amount: number
+          paystack_reference: string | null
+          status: string | null
+          tax_amount: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          net_amount: number
+          paystack_reference?: string | null
+          status?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          net_amount?: number
+          paystack_reference?: string | null
+          status?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      nigerian_banks: {
+        Row: {
+          bank_code: string
+          bank_name: string
+          id: number
+        }
+        Insert: {
+          bank_code: string
+          bank_name: string
+          id?: number
+        }
+        Update: {
+          bank_code?: string
+          bank_name?: string
+          id?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -209,11 +331,62 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawals: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          bank_account_id: string
+          confirmation_token: string | null
+          created_at: string | null
+          email_confirmed: boolean | null
+          id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          bank_account_id: string
+          confirmation_token?: string | null
+          created_at?: string | null
+          email_confirmed?: boolean | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          bank_account_id?: string
+          confirmation_token?: string | null
+          created_at?: string | null
+          email_confirmed?: boolean | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawals_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      create_withdrawal_request: {
+        Args: { withdrawal_amount: number; bank_account_id: string }
+        Returns: string
+      }
       get_current_user_profile: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -227,6 +400,13 @@ export type Database = {
           avatar_url: string
           created_at: string
           updated_at: string
+        }[]
+      }
+      get_nigerian_banks: {
+        Args: { search_term?: string }
+        Returns: {
+          bank_name: string
+          bank_code: string
         }[]
       }
       register_user: {
