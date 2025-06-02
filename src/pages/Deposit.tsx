@@ -17,7 +17,7 @@ const Deposit = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const PAYSTACK_LINK = "https://paystack.shop/pay/cb5bkq1xb5";
+  const PAYSTACK_BASE_LINK = "https://paystack.shop/pay/cb5bkq1xb5";
   const TAX_RATE = 0.03; // 3% tax
 
   useEffect(() => {
@@ -117,14 +117,22 @@ const Deposit = () => {
 
       if (transactionError) throw transactionError;
 
-      // Redirect to Paystack
       toast({
         title: "Redirecting to payment",
         description: "You will be redirected to complete your deposit",
       });
 
-      // In a real implementation, you would customize the Paystack link with amount and user details
-      window.open(PAYSTACK_LINK, '_blank');
+      // Create Paystack payment URL with amount in kobo (multiply by 100)
+      const paystackAmount = Math.round(depositAmount * 100);
+      const paystackUrl = `${PAYSTACK_BASE_LINK}?amount=${paystackAmount}&currency=NGN&reference=${depositData.id}&email=${user.email}`;
+      
+      // Redirect to Paystack
+      window.open(paystackUrl, '_blank');
+
+      // Navigate back to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
 
     } catch (error: any) {
       toast({
@@ -182,7 +190,7 @@ const Deposit = () => {
                   Make Deposit
                 </CardTitle>
                 <CardDescription>
-                  Deposit funds to earn daily percentage returns
+                  Deposit funds to earn 2.5% daily returns per ₦10,000
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -215,6 +223,10 @@ const Deposit = () => {
                         <span>Net Deposit:</span>
                         <span className="text-green-600">₦{netAmount.toFixed(2)}</span>
                       </div>
+                      <div className="flex justify-between text-sm text-blue-600 border-t pt-2">
+                        <span>Daily Earnings (2.5%):</span>
+                        <span>₦{((netAmount / 10000) * 0.025 * 10000).toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
 
@@ -243,7 +255,7 @@ const Deposit = () => {
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-medium text-gray-900">Daily Returns</h4>
-                    <p className="text-sm text-gray-600">Earn percentage returns on your deposit daily</p>
+                    <p className="text-sm text-gray-600">Earn 2.5% daily returns for every ₦10,000 deposited</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900">Tax Policy</h4>
@@ -257,6 +269,10 @@ const Deposit = () => {
                   <div>
                     <h4 className="font-medium text-gray-900">Processing Time</h4>
                     <p className="text-sm text-gray-600">Deposits are processed instantly after payment confirmation</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">Example</h4>
+                    <p className="text-sm text-gray-600">₦10,000 deposit = ₦250 daily earnings</p>
                   </div>
                 </div>
               </CardContent>
