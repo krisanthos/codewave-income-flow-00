@@ -164,44 +164,78 @@ const Dashboard = () => {
       const task = availableTasks.find(t => t.id === taskId);
       if (!task) return;
 
-      // Use the complete_user_task function
-      const { data: success, error } = await supabase.rpc('complete_user_task', {
-        task_id: taskId
-      });
-
-      if (error) throw error;
-
-      if (success) {
-        // Update local state
-        setCompletedTaskIds(prev => [...prev, taskId]);
-        setUserProfile(prev => ({
-          ...prev,
-          balance: (prev.balance || 0) + task.points
-        }));
-
-        // Refresh transactions to show the new reward
-        const { data: newTransactions } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (newTransactions) {
-          setTransactions(newTransactions);
-        }
-
-        toast({
-          title: "Task completed!",
-          description: `₦${task.points} has been added to your wallet`,
-        });
-      } else {
+      // Check if task is already completed
+      if (completedTaskIds.includes(taskId)) {
         toast({
           title: "Task already completed",
           description: "You have already completed this task",
           variant: "destructive",
         });
+        return;
       }
+
+      // Insert or update user_task record
+      const { error: userTaskError } = await supabase
+        .from('user_tasks')
+        .upsert({
+          user_id: user.id,
+          task_id: taskId,
+          status: 'completed',
+          points_earned: task.points,
+          completed_at: new Date().toISOString()
+        });
+
+      if (userTaskError) throw userTaskError;
+
+      // Update user balance
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({
+          balance: (userProfile.balance || 0) + task.points,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (balanceError) throw balanceError;
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'task_reward',
+          amount: task.points,
+          status: 'completed',
+          description: `Reward for completing: ${task.title}`,
+          currency: 'NGN'
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update local state
+      setCompletedTaskIds(prev => [...prev, taskId]);
+      setUserProfile(prev => ({
+        ...prev,
+        balance: (prev.balance || 0) + task.points
+      }));
+
+      // Refresh transactions to show the new reward
+      const { data: newTransactions } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (newTransactions) {
+        setTransactions(newTransactions);
+      }
+
+      toast({
+        title: "Task completed!",
+        description: `₦${task.points} has been added to your wallet`,
+      });
+
     } catch (error: any) {
       console.error("Error completing task:", error);
       toast({
