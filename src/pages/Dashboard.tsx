@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -136,12 +135,85 @@ const Dashboard = () => {
 
     setIsClaimingEarnings(true);
     try {
-      // Call the daily earnings calculation function
-      const { error } = await supabase.rpc('calculate_daily_earnings');
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if already claimed today
+      const { data: existingEarning } = await supabase
+        .from('daily_earnings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .single();
 
-      if (error) throw error;
+      if (existingEarning) {
+        toast({
+          title: "Already claimed",
+          description: "You have already claimed your daily earnings today.",
+          variant: "destructive",
+        });
+        setIsClaimingEarnings(false);
+        return;
+      }
 
-      // Refresh user profile and transactions
+      // Calculate earnings: 2.5% per day for every 10,000
+      const dailyRate = 0.025;
+      const earningAmount = Math.floor(userProfile.balance / 10000) * dailyRate * 10000;
+
+      if (earningAmount <= 0) {
+        toast({
+          title: "No earnings available",
+          description: "You need at least ₦10,000 balance to earn daily rewards.",
+          variant: "destructive",
+        });
+        setIsClaimingEarnings(false);
+        return;
+      }
+
+      // Insert daily earning record
+      const { error: earningError } = await supabase
+        .from('daily_earnings')
+        .insert({
+          user_id: user.id,
+          amount: earningAmount,
+          date: today
+        });
+
+      if (earningError) throw earningError;
+
+      // Update user balance
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({
+          balance: userProfile.balance + earningAmount,
+          total_earned: (userProfile.total_earned || 0) + earningAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (balanceError) throw balanceError;
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'daily_earning',
+          amount: earningAmount,
+          status: 'completed',
+          description: `Daily earnings (2.5% on ₦${Math.floor(userProfile.balance / 10000) * 10000})`,
+          currency: 'NGN'
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update local state
+      setUserProfile(prev => ({
+        ...prev,
+        balance: prev.balance + earningAmount,
+        total_earned: (prev.total_earned || 0) + earningAmount
+      }));
+
+      // Refresh data
       const [profileResult, transactionsResult, dailyEarningsResult] = await Promise.all([
         supabase.rpc('get_current_user_profile'),
         supabase
@@ -170,7 +242,7 @@ const Dashboard = () => {
 
       toast({
         title: "Daily earnings claimed!",
-        description: "Your daily earnings have been added to your wallet",
+        description: `₦${earningAmount.toLocaleString()} has been added to your wallet`,
       });
 
     } catch (error: any) {
