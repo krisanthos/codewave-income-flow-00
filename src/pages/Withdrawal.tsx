@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CreditCard, DollarSign } from 'lucide-react';
+import { ArrowLeft, CreditCard, DollarSign, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,7 +27,7 @@ const Withdrawal = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const WITHDRAWAL_LIMIT = 39450;
+  const WITHDRAWAL_LIMIT = 45000; // Updated to ₦45,000
 
   useEffect(() => {
     if (!user) {
@@ -70,10 +70,10 @@ const Withdrawal = () => {
       return;
     }
 
-    if (withdrawalAmount > WITHDRAWAL_LIMIT) {
+    if (withdrawalAmount < WITHDRAWAL_LIMIT) {
       toast({
-        title: "Amount exceeds limit",
-        description: `Maximum withdrawal amount is ₦${WITHDRAWAL_LIMIT.toLocaleString()}`,
+        title: "Amount below minimum",
+        description: `Minimum withdrawal amount is ₦${WITHDRAWAL_LIMIT.toLocaleString()}`,
         variant: "destructive",
       });
       return;
@@ -82,7 +82,7 @@ const Withdrawal = () => {
     if (withdrawalAmount > (userProfile?.balance || 0)) {
       toast({
         title: "Insufficient balance",
-        description: "You don't have enough balance for this withdrawal",
+        description: `You don't have enough balance for this withdrawal. Your current balance is ₦${(userProfile?.balance || 0).toLocaleString()}`,
         variant: "destructive",
       });
       return;
@@ -91,7 +91,7 @@ const Withdrawal = () => {
     setIsLoading(true);
 
     try {
-      // Create withdrawal request
+      // Use the withdrawal function that validates minimum amount and balance
       const { data: withdrawalId, error: withdrawalError } = await supabase
         .rpc('create_withdrawal_request', {
           withdrawal_amount: withdrawalAmount,
@@ -116,7 +116,7 @@ const Withdrawal = () => {
 
       toast({
         title: "Withdrawal request submitted",
-        description: "Check your email for confirmation link to approve the withdrawal.",
+        description: "Your withdrawal request has been sent to admin for processing.",
       });
 
       // Reset form
@@ -126,9 +126,10 @@ const Withdrawal = () => {
       // Navigate back to dashboard
       navigate('/dashboard');
     } catch (error: any) {
+      console.error("Withdrawal error:", error);
       toast({
         title: "Withdrawal failed",
-        description: error.message,
+        description: error.message || "An error occurred while processing your withdrawal",
         variant: "destructive",
       });
     } finally {
@@ -146,6 +147,8 @@ const Withdrawal = () => {
       </div>
     );
   }
+
+  const canWithdraw = (userProfile?.balance || 0) >= WITHDRAWAL_LIMIT;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -167,6 +170,26 @@ const Withdrawal = () => {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Insufficient Balance Warning */}
+        {!canWithdraw && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardHeader>
+              <CardTitle className="flex items-center text-red-800">
+                <AlertTriangle className="mr-2" size={20} />
+                Insufficient Balance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-700 mb-2">
+                Your current balance (₦{(userProfile.balance || 0).toLocaleString()}) is below the minimum withdrawal amount of ₦{WITHDRAWAL_LIMIT.toLocaleString()}.
+              </p>
+              <p className="text-red-600 text-sm">
+                Please make a deposit or complete more tasks to increase your balance before requesting a withdrawal.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Bank Account Selection */}
           <div>
@@ -176,7 +199,7 @@ const Withdrawal = () => {
           {/* Withdrawal Form */}
           <div>
             {selectedAccount ? (
-              <Card>
+              <Card className={!canWithdraw ? "opacity-50" : ""}>
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <DollarSign className="mr-2 h-5 w-5" />
@@ -195,17 +218,22 @@ const Withdrawal = () => {
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="Enter withdrawal amount"
+                        placeholder={`Minimum ₦${WITHDRAWAL_LIMIT.toLocaleString()}`}
                         required
-                        max={Math.min(WITHDRAWAL_LIMIT, userProfile.balance || 0)}
-                        min="1"
+                        min={WITHDRAWAL_LIMIT}
+                        max={userProfile.balance || 0}
+                        disabled={!canWithdraw}
                       />
                       <p className="text-sm text-gray-500 mt-1">
-                        Maximum: ₦{Math.min(WITHDRAWAL_LIMIT, userProfile.balance || 0).toLocaleString()}
+                        Available: ₦{(userProfile.balance || 0).toLocaleString()}
                       </p>
                     </div>
                     
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={isLoading || !canWithdraw}
+                    >
                       {isLoading ? "Processing..." : "Submit Withdrawal Request"}
                     </Button>
                     
@@ -214,6 +242,7 @@ const Withdrawal = () => {
                       variant="outline" 
                       className="w-full"
                       onClick={() => setSelectedAccount(null)}
+                      disabled={!canWithdraw}
                     >
                       Change Bank Account
                     </Button>
@@ -248,16 +277,27 @@ const Withdrawal = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <h4 className="font-medium text-gray-900">Processing Time</h4>
-                <p className="text-gray-600">3-5 business hours</p>
+                <p className="text-gray-600">Admin review required</p>
               </div>
               <div>
-                <h4 className="font-medium text-gray-900">Maximum Amount</h4>
+                <h4 className="font-medium text-gray-900">Minimum Amount</h4>
                 <p className="text-gray-600">₦{WITHDRAWAL_LIMIT.toLocaleString()}</p>
               </div>
               <div>
                 <h4 className="font-medium text-gray-900">Available Balance</h4>
                 <p className="text-gray-600">₦{(userProfile.balance || 0).toLocaleString()}</p>
               </div>
+            </div>
+            
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">How Withdrawals Work:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Minimum withdrawal amount is ₦{WITHDRAWAL_LIMIT.toLocaleString()}</li>
+                <li>• Your withdrawal request will be sent to the admin dashboard</li>
+                <li>• Admin will review and process your request</li>
+                <li>• The amount will be deducted from your balance immediately</li>
+                <li>• You'll be notified once the transfer is completed</li>
+              </ul>
             </div>
           </CardContent>
         </Card>

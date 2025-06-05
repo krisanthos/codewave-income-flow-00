@@ -280,6 +280,31 @@ const Deposit = () => {
 
             <Card>
               <CardHeader>
+                <CardTitle>Tax Calculation Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                    <h4 className="font-medium text-green-800">First-Time Users</h4>
+                    <p className="text-sm text-green-700">
+                      • First ₦5,000 is completely tax-free
+                      • 3% tax only applies to amounts above ₦5,000
+                      • Example: ₦10,000 deposit = ₦150 tax (3% of ₦5,000)
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <h4 className="font-medium text-blue-800">Subsequent Deposits</h4>
+                    <p className="text-sm text-blue-700">
+                      • 3% tax applies to the full deposit amount
+                      • Example: ₦10,000 deposit = ₦300 tax
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Your Deposit History</CardTitle>
               </CardHeader>
               <CardContent>
@@ -302,6 +327,7 @@ const Deposit = () => {
               <div>
                 <p className="text-sm text-gray-600">
                   Your payment is secured by Paystack. You'll be redirected to complete the transaction.
+                  After successful payment, your balance will be automatically updated with the net amount.
                 </p>
               </div>
               <div className="text-right">

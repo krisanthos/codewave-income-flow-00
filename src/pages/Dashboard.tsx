@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Menu, X, ArrowRight, User, BarChart, LogOut, ListTodo, CreditCard, TrendingUp, Wallet } from "lucide-react";
+import { Menu, X, ArrowRight, User, BarChart, LogOut, ListTodo, CreditCard, TrendingUp, Wallet, Clock, Gift } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,22 +18,21 @@ interface Transaction {
   description: string;
 }
 
-interface Task {
+interface DailyEarning {
   id: string;
-  title: string;
-  points: number;
-  estimated_time_minutes: number;
-  platform: string;
-  difficulty: string;
+  amount: number;
+  date: string;
+  created_at: string;
 }
 
 const Dashboard = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
-  const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
+  const [dailyEarnings, setDailyEarnings] = useState<DailyEarning[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClaimingEarnings, setIsClaimingEarnings] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [lastEarningsCheck, setLastEarningsCheck] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -45,9 +44,8 @@ const Dashboard = () => {
 
     const fetchDashboardData = async () => {
       try {
-        // Use the security definer function to get profile data safely
-        const [profileResult, transactionsResult, tasksResult, userTasksResult] = await Promise.all([
-          // Get user profile using the security definer function
+        // Get user profile using the security definer function
+        const [profileResult, transactionsResult, dailyEarningsResult] = await Promise.all([
           supabase.rpc('get_current_user_profile'),
           
           // Get recent transactions
@@ -58,25 +56,18 @@ const Dashboard = () => {
             .order('created_at', { ascending: false })
             .limit(10),
           
-          // Get available tasks
+          // Get daily earnings
           supabase
-            .from('tasks')
+            .from('daily_earnings')
             .select('*')
-            .eq('is_active', true)
-            .limit(10),
-
-          // Get user's completed tasks
-          supabase
-            .from('user_tasks')
-            .select('task_id')
             .eq('user_id', user.id)
-            .eq('status', 'completed')
+            .order('date', { ascending: false })
+            .limit(7)
         ]);
 
         console.log("Profile result:", profileResult);
         console.log("Transactions result:", transactionsResult);
-        console.log("Tasks result:", tasksResult);
-        console.log("User tasks result:", userTasksResult);
+        console.log("Daily earnings result:", dailyEarningsResult);
 
         if (profileResult.error) {
           console.error("Profile fetch error:", profileResult.error);
@@ -101,26 +92,6 @@ const Dashboard = () => {
           setUserProfile(newProfile);
         } else if (profileResult.data && profileResult.data.length > 0) {
           setUserProfile(profileResult.data[0]);
-        } else {
-          // Profile function returned empty, create profile
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || 'New User',
-              phone: user.user_metadata?.phone,
-              balance: 2500,
-              total_earned: 0,
-              registration_fee_paid: true
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            throw createError;
-          }
-          setUserProfile(newProfile);
         }
 
         if (transactionsResult.error) {
@@ -129,17 +100,20 @@ const Dashboard = () => {
           setTransactions(transactionsResult.data || []);
         }
 
-        if (tasksResult.error) {
-          console.error("Tasks fetch error:", tasksResult.error);
+        if (dailyEarningsResult.error) {
+          console.error("Daily earnings fetch error:", dailyEarningsResult.error);
         } else {
-          setAvailableTasks(tasksResult.data || []);
+          setDailyEarnings(dailyEarningsResult.data || []);
         }
 
-        if (userTasksResult.error) {
-          console.error("User tasks fetch error:", userTasksResult.error);
-        } else {
-          const completed = userTasksResult.data?.map(t => t.task_id) || [];
-          setCompletedTaskIds(completed);
+        // Check if user can claim daily earnings
+        const today = new Date().toISOString().split('T')[0];
+        const todayEarning = dailyEarningsResult.data?.find(earning => 
+          earning.date === today
+        );
+        
+        if (!todayEarning) {
+          setLastEarningsCheck(today);
         }
 
       } catch (error: any) {
@@ -157,41 +131,71 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [user, navigate]);
 
-  const handleTaskCompletion = async (taskId: string) => {
+  const handleClaimDailyEarnings = async () => {
+    if (!user || !userProfile) return;
+
+    setIsClaimingEarnings(true);
+    try {
+      // Call the daily earnings calculation function
+      const { error } = await supabase.rpc('calculate_daily_earnings');
+
+      if (error) throw error;
+
+      // Refresh user profile and transactions
+      const [profileResult, transactionsResult, dailyEarningsResult] = await Promise.all([
+        supabase.rpc('get_current_user_profile'),
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('daily_earnings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .limit(7)
+      ]);
+
+      if (profileResult.data && profileResult.data.length > 0) {
+        setUserProfile(profileResult.data[0]);
+      }
+      if (transactionsResult.data) {
+        setTransactions(transactionsResult.data);
+      }
+      if (dailyEarningsResult.data) {
+        setDailyEarnings(dailyEarningsResult.data);
+      }
+
+      toast({
+        title: "Daily earnings claimed!",
+        description: "Your daily earnings have been added to your wallet",
+      });
+
+    } catch (error: any) {
+      console.error("Error claiming daily earnings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to claim daily earnings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClaimingEarnings(false);
+    }
+  };
+
+  const handleSocialMediaTask = async () => {
     if (!user || !userProfile) return;
 
     try {
-      const task = availableTasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      // Check if task is already completed
-      if (completedTaskIds.includes(taskId)) {
-        toast({
-          title: "Task already completed",
-          description: "You have already completed this task",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Insert or update user_task record
-      const { error: userTaskError } = await supabase
-        .from('user_tasks')
-        .upsert({
-          user_id: user.id,
-          task_id: taskId,
-          status: 'completed',
-          points_earned: task.points,
-          completed_at: new Date().toISOString()
-        });
-
-      if (userTaskError) throw userTaskError;
+      const taskReward = 100; // ₦100 for social media tasks
 
       // Update user balance
       const { error: balanceError } = await supabase
         .from('profiles')
         .update({
-          balance: (userProfile.balance || 0) + task.points,
+          balance: (userProfile.balance || 0) + taskReward,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -204,22 +208,21 @@ const Dashboard = () => {
         .insert({
           user_id: user.id,
           type: 'task_reward',
-          amount: task.points,
+          amount: taskReward,
           status: 'completed',
-          description: `Reward for completing: ${task.title}`,
+          description: 'Social Media Task Completion',
           currency: 'NGN'
         });
 
       if (transactionError) throw transactionError;
 
       // Update local state
-      setCompletedTaskIds(prev => [...prev, taskId]);
       setUserProfile(prev => ({
         ...prev,
-        balance: (prev.balance || 0) + task.points
+        balance: (prev.balance || 0) + taskReward
       }));
 
-      // Refresh transactions to show the new reward
+      // Refresh transactions
       const { data: newTransactions } = await supabase
         .from('transactions')
         .select('*')
@@ -233,11 +236,11 @@ const Dashboard = () => {
 
       toast({
         title: "Task completed!",
-        description: `₦${task.points} has been added to your wallet`,
+        description: `₦${taskReward} has been added to your wallet`,
       });
 
     } catch (error: any) {
-      console.error("Error completing task:", error);
+      console.error("Error completing social media task:", error);
       toast({
         title: "Error",
         description: "Failed to complete task. Please try again.",
@@ -257,11 +260,15 @@ const Dashboard = () => {
 
   // Calculate daily bonus based on balance (2.5% daily for every 10,000)
   const calculateDailyBonus = (balance: number) => {
-    return Math.round((balance / 10000) * 0.025 * 10000);
+    return Math.floor(balance / 10000) * 0.025 * 10000;
   };
 
-  // Filter out completed tasks
-  const tasksToShow = availableTasks.filter(task => !completedTaskIds.includes(task.id));
+  // Check if user can claim daily earnings
+  const canClaimDailyEarnings = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayEarning = dailyEarnings.find(earning => earning.date === today);
+    return !todayEarning && userProfile?.balance > 0;
+  };
 
   // Show loading state
   if (isLoading) {
@@ -339,14 +346,6 @@ const Dashboard = () => {
                 Profile
               </Link>
               <Link 
-                to="/tasks"
-                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <ListTodo className="inline mr-2" size={16} />
-                Tasks
-              </Link>
-              <Link 
                 to="/deposit"
                 className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
                 onClick={() => setIsMenuOpen(false)}
@@ -388,10 +387,6 @@ const Dashboard = () => {
                 <Link to="/profile" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
                   <User className="mr-3" size={20} />
                   Profile
-                </Link>
-                <Link to="/tasks" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
-                  <ListTodo className="mr-3" size={20} />
-                  Tasks
                 </Link>
                 <Link to="/deposit" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-3 py-2 text-sm font-medium rounded-md">
                   <TrendingUp className="mr-3" size={20} />
@@ -448,11 +443,35 @@ const Dashboard = () => {
               </Card>
             </div>
 
+            {/* Daily Earnings Claim Section */}
+            {canClaimDailyEarnings() && (
+              <Card className="mt-6 border-yellow-200 bg-yellow-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-yellow-800">
+                    <Gift className="mr-2" size={20} />
+                    Daily Earnings Available
+                  </CardTitle>
+                  <CardDescription className="text-yellow-700">
+                    You can claim your daily earnings of ₦{calculateDailyBonus(userProfile.balance || 0).toLocaleString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={handleClaimDailyEarnings}
+                    disabled={isClaimingEarnings}
+                    className="bg-yellow-600 hover:bg-yellow-700"
+                  >
+                    {isClaimingEarnings ? "Claiming..." : "Claim Daily Earnings"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="mt-8">
               <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="tasks">Available Tasks</TabsTrigger>
+                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
                   <TabsTrigger value="transactions">Transactions</TabsTrigger>
                 </TabsList>
                 
@@ -467,17 +486,20 @@ const Dashboard = () => {
                     <CardContent className="space-y-4">
                       <div className="bg-green-50 border border-green-200 rounded-md p-4">
                         <p className="text-sm text-green-800">
-                          Complete more tasks and make deposits to increase your daily earnings!
+                          Complete tasks and make deposits to increase your daily earnings!
                         </p>
                       </div>
                       
                       <div className="mt-6">
                         <h3 className="font-medium text-gray-900">Quick Actions</h3>
                         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          <Link to="/tasks" className="bg-blue-50 border border-blue-200 rounded-md p-3 hover:bg-blue-100 transition-colors">
-                            <h4 className="font-medium text-blue-800">Complete Tasks</h4>
-                            <p className="text-sm text-blue-600">Earn ₦50-100 per task</p>
-                          </Link>
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <h4 className="font-medium text-blue-800">Social Media Task</h4>
+                            <p className="text-sm text-blue-600 mb-2">Earn ₦100 for completing social media tasks</p>
+                            <Button onClick={handleSocialMediaTask} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                              Complete Task (₦100)
+                            </Button>
+                          </div>
                           <Link to="/deposit" className="bg-green-50 border border-green-200 rounded-md p-3 hover:bg-green-100 transition-colors">
                             <h4 className="font-medium text-green-800">Make Deposit</h4>
                             <p className="text-sm text-green-600">Earn 2.5% daily returns</p>
@@ -491,47 +513,26 @@ const Dashboard = () => {
                 <TabsContent value="tasks" className="mt-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Available Tasks</CardTitle>
+                      <CardTitle className="flex items-center">
+                        <Clock className="mr-2" size={20} />
+                        Tasks
+                      </CardTitle>
                       <CardDescription>
-                        Complete tasks to earn rewards instantly
+                        More tasks coming soon!
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4">
-                        {tasksToShow.length > 0 ? (
-                          tasksToShow.map((task) => (
-                            <div key={task.id} className="border rounded-lg p-4">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-gray-900">{task.title}</h4>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    Platform: {task.platform} • Difficulty: {task.difficulty}
-                                  </p>
-                                  {task.estimated_time_minutes && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Estimated time: {task.estimated_time_minutes} minutes
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="ml-4 text-right">
-                                  <div className="text-lg font-bold text-green-600">₦{task.points}</div>
-                                  <Button 
-                                    onClick={() => handleTaskCompletion(task.id)}
-                                    size="sm"
-                                    className="mt-2"
-                                  >
-                                    Complete Task
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-8">
-                            <p className="text-gray-500">No available tasks at the moment.</p>
-                            <p className="text-sm text-gray-400 mt-1">Check back later for new tasks!</p>
-                          </div>
-                        )}
+                      <div className="text-center py-8">
+                        <Clock className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">More Tasks Coming Soon!</h3>
+                        <p className="text-gray-500 mb-4">We're working on bringing you more exciting tasks to earn rewards.</p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 max-w-md mx-auto">
+                          <h4 className="font-medium text-blue-800 mb-2">Available Now: Social Media Task</h4>
+                          <p className="text-sm text-blue-600 mb-3">Complete social media engagement tasks to earn ₦100</p>
+                          <Button onClick={handleSocialMediaTask} className="bg-blue-600 hover:bg-blue-700">
+                            Complete Social Media Task
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
