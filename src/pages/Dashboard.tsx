@@ -175,6 +175,7 @@ const Dashboard = () => {
         .from('daily_earnings')
         .insert({
           deposit_id: dummyDepositId,
+          user_id: user.id,
           amount: earningAmount,
           date: today
         });
