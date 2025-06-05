@@ -59,7 +59,6 @@ const Dashboard = () => {
           supabase
             .from('daily_earnings')
             .select('*')
-            .eq('user_id', user.id)
             .order('date', { ascending: false })
             .limit(7)
         ]);
@@ -141,7 +140,6 @@ const Dashboard = () => {
       const { data: existingEarning } = await supabase
         .from('daily_earnings')
         .select('*')
-        .eq('user_id', user.id)
         .eq('date', today)
         .single();
 
@@ -169,11 +167,14 @@ const Dashboard = () => {
         return;
       }
 
-      // Insert daily earning record
+      // Create a dummy deposit ID for the daily earnings record
+      const dummyDepositId = crypto.randomUUID();
+
+      // Insert daily earning record (using the actual schema)
       const { error: earningError } = await supabase
         .from('daily_earnings')
         .insert({
-          user_id: user.id,
+          deposit_id: dummyDepositId,
           amount: earningAmount,
           date: today
         });
@@ -225,7 +226,6 @@ const Dashboard = () => {
         supabase
           .from('daily_earnings')
           .select('*')
-          .eq('user_id', user.id)
           .order('date', { ascending: false })
           .limit(7)
       ]);
