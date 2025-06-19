@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,9 @@ const Auth = () => {
     phone: "",
   });
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const confirmed = searchParams.get('confirmed');
+  const paymentSuccess = searchParams.get('payment_success');
 
   useEffect(() => {
     // Check if user is already logged in
@@ -34,7 +37,23 @@ const Auth = () => {
       }
     };
     checkAuth();
-  }, [navigate]);
+
+    // Handle email confirmation
+    if (confirmed === 'true') {
+      toast({
+        title: "Email confirmed!",
+        description: "Your account has been activated. You can now log in.",
+      });
+    }
+
+    // Handle payment success return
+    if (paymentSuccess === 'true') {
+      toast({
+        title: "Payment successful!",
+        description: "Please check your email for a confirmation link to activate your account.",
+      });
+    }
+  }, [navigate, confirmed, paymentSuccess]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +138,8 @@ const Auth = () => {
           data: {
             full_name: signupData.full_name,
             phone: signupData.phone,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/login?confirmed=true`
         }
       });
 
@@ -127,11 +147,21 @@ const Auth = () => {
 
       if (data.user) {
         toast({
-          title: "Registration successful!",
-          description: "Welcome to CodeWave! ₦2,500 has been credited to your account.",
+          title: "Account created!",
+          description: "Redirecting to payment...",
         });
 
-        navigate('/dashboard');
+        // Store user data temporarily for after payment
+        localStorage.setItem('pendingUserData', JSON.stringify({
+          userId: data.user.id,
+          email: signupData.email,
+          fullName: signupData.full_name,
+          phone: signupData.phone
+        }));
+
+        // Redirect to payment with return URL
+        const returnUrl = encodeURIComponent(`${window.location.origin}/auth?payment_success=true`);
+        window.location.href = `https://paystack.shop/pay/cb5bkq1xb5?callback_url=${returnUrl}`;
       }
     } catch (error: any) {
       toast({
@@ -230,7 +260,7 @@ const Auth = () => {
                   </CardDescription>
                   <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
                     <p className="text-sm text-green-800 font-medium">
-                      🎉 Get ₦2,500 welcome bonus instantly!
+                      🎉 Get ₦2,500 welcome bonus after payment!
                     </p>
                   </div>
                 </CardHeader>
@@ -303,7 +333,7 @@ const Auth = () => {
                     className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                     disabled={isLoading}
                   >
-                    {isLoading ? "Creating account..." : "Create Account & Get ₦2,500 Free"}
+                    {isLoading ? "Creating account..." : "Create Account & Pay"}
                   </Button>
                 </CardFooter>
               </form>

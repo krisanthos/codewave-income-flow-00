@@ -1,27 +1,25 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false); // ✌️ Remember me state 🥀
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const confirmed = searchParams.get('confirmed');
 
   useEffect(() => {
-    // ✌️ Check if user is already logged in 💔
+    // Check if user is already logged in
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -29,85 +27,38 @@ const Login = () => {
       }
     };
     checkAuth();
-  }, [navigate]);
 
-  useEffect(() => {
-    // ✌️ Set up inactivity logout for remember me users ❤️‍🩹
-    let inactivityTimer: NodeJS.Timeout;
-    
-    const resetInactivityTimer = () => {
-      clearTimeout(inactivityTimer);
-      if (rememberMe) {
-        // ✌️ 48 hours of inactivity = logout 🥀
-        inactivityTimer = setTimeout(() => {
-          supabase.auth.signOut();
-          toast({
-            title: "Session expired",
-            description: "You've been logged out due to inactivity.",
-            variant: "destructive",
-          });
-        }, 48 * 60 * 60 * 1000); // 48 hours in milliseconds
-      }
-    };
-
-    // ✌️ Track user activity events 💔
-    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    
-    const handleActivity = () => {
-      if (rememberMe) {
-        resetInactivityTimer();
-      }
-    };
-
-    activityEvents.forEach(event => {
-      document.addEventListener(event, handleActivity, true);
-    });
-
-    return () => {
-      clearTimeout(inactivityTimer);
-      activityEvents.forEach(event => {
-        document.removeEventListener(event, handleActivity, true);
+    // Handle email confirmation
+    if (confirmed === 'true') {
+      toast({
+        title: "Email confirmed!",
+        description: "Your account has been activated. You can now log in and start earning!",
       });
-    };
-  }, [rememberMe]);
+    }
+  }, [navigate, confirmed]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // ✌️ Sign in with different persistence based on remember me 🥀
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
+        email,
+        password,
       });
 
       if (error) throw error;
 
-      // ✌️ Configure session persistence 💔
-      if (rememberMe) {
-        // Set persistent session that lasts longer
-        await supabase.auth.refreshSession();
-        localStorage.setItem('rememberMe', 'true');
-      } else {
-        localStorage.removeItem('rememberMe');
-      }
-
       toast({
-        title: "Login successful! 🎉",
-        description: "Welcome back to CodeWave!",
+        title: "Welcome back!",
+        description: "You have successfully logged in.",
       });
-      
-      navigate("/dashboard");
+
+      navigate('/dashboard');
     } catch (error: any) {
-      console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: error.message || "Please check your credentials.",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -126,46 +77,42 @@ const Login = () => {
           <div className="flex justify-center mb-4">
             <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-16" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Sign in to your account
-          </h2>
+          <h2 className="mt-2 text-center text-3xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Welcome back</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{" "}
+            Don't have an account?{" "}
             <Link to="/signup" className="font-medium text-green-600 hover:text-green-500">
-              create a new account
+              Create one here
             </Link>
           </p>
         </div>
         <Card className="bg-white/80 backdrop-blur-md shadow-xl border-green-100">
           <CardHeader>
-            <CardTitle className="text-green-800">Welcome Back 👋</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+            <CardTitle className="text-green-800">Sign In</CardTitle>
+            <CardDescription>
+              Enter your credentials to access your account
+            </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">📧 Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
-                  placeholder="name@example.com"
-                  value={formData.email}
-                  onChange={handleChange}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="border-green-200 focus:border-green-500"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">🔐 Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
-                    name="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleChange}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                     className="border-green-200 focus:border-green-500 pr-10"
                   />
@@ -178,27 +125,14 @@ const Login = () => {
                   </button>
                 </div>
               </div>
-              
-              {/* ✌️ Remember me checkbox 💔 */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  className="border-green-300 data-[state=checked]:bg-green-600"
-                />
-                <Label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer">
-                  🕐 Keep me logged in (auto-logout after 48h of inactivity)
-                </Label>
-              </div>
             </CardContent>
             <CardFooter>
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" 
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 disabled={isLoading}
               >
-                {isLoading ? "Signing in... ⏳" : "Sign In 🚀"}
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </CardFooter>
           </form>
