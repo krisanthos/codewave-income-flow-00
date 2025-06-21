@@ -6,23 +6,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserDetails {
   id: string;
-  username: string;
-  fullName: string;
+  full_name: string;
   email: string;
-  phoneNumber: string;
-  joinDate: string;
+  phone: string;
+  created_at: string;
   balance: number;
+  total_earned: number;
+  registration_fee_paid: boolean;
 }
 
 interface Transaction {
   id: string;
   type: string;
   amount: number;
-  date: string;
+  created_at: string;
   status: string;
+  description: string;
 }
 
 const UserDetail = () => {
@@ -33,142 +36,143 @@ const UserDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      navigate('/admin-auth');
-      return;
-    }
-
-    const fetchUserDetails = async () => {
-      try {
-        // Fetch user data
-        const userResponse = await fetch(`/api/admin/users/${id}`, {
-          headers: {
-            'x-auth-token': token,
-          },
-        });
-
-        if (!userResponse.ok) {
-          throw new Error('Failed to fetch user details');
-        }
-
-        const userData = await userResponse.json();
-        
-        setUser({
-          id: userData._id,
-          username: userData.username,
-          fullName: userData.fullName,
-          email: userData.email,
-          phoneNumber: userData.phoneNumber,
-          joinDate: new Date(userData.registrationDate).toLocaleDateString(),
-          balance: userData.balance,
-        });
-        
-        // Fetch user transactions
-        const transactionsResponse = await fetch(`/api/admin/users/${id}/transactions`, {
-          headers: {
-            'x-auth-token': token,
-          },
-        });
-
-        if (!transactionsResponse.ok) {
-          throw new Error('Failed to fetch user transactions');
-        }
-
-        const transactionsData = await transactionsResponse.json();
-        
-        setTransactions(
-          transactionsData.map((transaction: any) => ({
-            id: transaction._id,
-            type: transaction.type,
-            amount: transaction.amount,
-            date: new Date(transaction.createdAt).toLocaleDateString(),
-            status: transaction.status,
-          }))
-        );
-      } catch (error) {
-        console.error('Error fetching user details:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load user details',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsLoading(false);
+    const checkAdminAndFetchData = async () => {
+      // Check admin access
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/admin-auth');
+        return;
       }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (!profile || profile.email !== 'admin@codewave.com') {
+        toast({
+          title: "Access Denied",
+          description: "Admin privileges required",
+          variant: "destructive",
+        });
+        navigate('/admin-auth');
+        return;
+      }
+
+      await fetchUserDetails();
     };
 
-    fetchUserDetails();
+    checkAdminAndFetchData();
   }, [id, navigate]);
 
-  // Event handlers for admin actions
-  const handleSuspendUser = async () => {
-    // Implementation for suspending a user
-    toast({
-      title: 'User Suspended',
-      description: 'The user account has been suspended.',
-    });
+  const fetchUserDetails = async () => {
+    if (!id) return;
+
+    try {
+      // Fetch user data
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (userError) throw userError;
+      
+      setUser(userData);
+      
+      // Fetch user transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', id)
+        .order('created_at', { ascending: false });
+
+      if (transactionsError) throw transactionsError;
+      
+      setTransactions(transactionsData || []);
+    } catch (error: any) {
+      console.error('Error fetching user details:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load user details: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteAccount = async () => {
-    // Implementation for deleting a user account
-    toast({
-      title: 'Account Deleted',
-      description: 'The user account has been deleted.',
-      variant: 'destructive',
-    });
+  const handleUpdateBalance = async (amount: number, operation: 'add' | 'deduct') => {
+    if (!user || !id) return;
+
+    try {
+      const newBalance = operation === 'add' 
+        ? Number(user.balance) + amount 
+        : Number(user.balance) - amount;
+
+      if (newBalance < 0) {
+        toast({
+          title: 'Error',
+          description: 'Cannot deduct more than current balance',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update user balance
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', id);
+
+      if (balanceError) throw balanceError;
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: id,
+          type: operation === 'add' ? 'admin_credit' : 'admin_debit',
+          amount: amount,
+          status: 'completed',
+          description: `Admin ${operation === 'add' ? 'added' : 'deducted'} ₦${amount.toLocaleString()}`,
+          currency: 'NGN'
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Refresh data
+      await fetchUserDetails();
+
+      toast({
+        title: 'Success',
+        description: `₦${amount.toLocaleString()} ${operation === 'add' ? 'added to' : 'deducted from'} user's account`,
+      });
+    } catch (error: any) {
+      console.error('Error updating balance:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update balance: ' + error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleAddFunds = async () => {
-    // Implementation for adding funds to a user's account
-    const amount = window.prompt('Enter amount to add:', '1000');
+  const handleAddFunds = () => {
+    const amount = window.prompt('Enter amount to add:');
     if (amount && !isNaN(Number(amount)) && Number(amount) > 0) {
-      toast({
-        title: 'Funds Added',
-        description: `₦${Number(amount).toLocaleString()} has been added to the user's account.`,
-      });
+      handleUpdateBalance(Number(amount), 'add');
     }
   };
 
-  const handleDeductFunds = async () => {
-    // Implementation for deducting funds from a user's account
-    const amount = window.prompt('Enter amount to deduct:', '500');
+  const handleDeductFunds = () => {
+    const amount = window.prompt('Enter amount to deduct:');
     if (amount && !isNaN(Number(amount)) && Number(amount) > 0) {
-      toast({
-        title: 'Funds Deducted',
-        description: `₦${Number(amount).toLocaleString()} has been deducted from the user's account.`,
-      });
+      handleUpdateBalance(Number(amount), 'deduct');
     }
   };
 
-  const handleApproveTransactions = async () => {
-    // Implementation for approving all pending transactions
-    toast({
-      title: 'Transactions Approved',
-      description: 'All pending transactions have been approved.',
-    });
-  };
-
-  const handleRejectTransactions = async () => {
-    // Implementation for rejecting all pending transactions
-    toast({
-      title: 'Transactions Rejected',
-      description: 'All pending transactions have been rejected.',
-      variant: 'destructive',
-    });
-  };
-
-  const handleSendMessage = async () => {
-    // Implementation for sending a message to the user
-    const message = window.prompt('Enter message to send to user:');
-    if (message && message.trim()) {
-      toast({
-        title: 'Message Sent',
-        description: 'Your message has been sent to the user.',
-      });
-    }
-  };
-  
   // Show loading state
   if (isLoading || !user) {
     return (
@@ -198,12 +202,8 @@ const UserDetail = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Username</span>
-                <span className="text-lg">{user.username}</span>
-              </div>
-              <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Full Name</span>
-                <span className="text-lg">{user.fullName}</span>
+                <span className="text-lg">{user.full_name || 'No name provided'}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Email</span>
@@ -211,15 +211,25 @@ const UserDetail = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Phone Number</span>
-                <span className="text-lg">{user.phoneNumber}</span>
+                <span className="text-lg">{user.phone || 'No phone provided'}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Joined Date</span>
-                <span className="text-lg">{user.joinDate}</span>
+                <span className="text-lg">{new Date(user.created_at).toLocaleDateString()}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Current Balance</span>
-                <span className="text-lg font-bold">₦{user.balance.toLocaleString()}</span>
+                <span className="text-lg font-bold">₦{Number(user.balance || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-500">Total Earned</span>
+                <span className="text-lg font-bold">₦{Number(user.total_earned || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-500">Registration Fee</span>
+                <span className={`text-lg font-medium ${user.registration_fee_paid ? 'text-green-600' : 'text-red-600'}`}>
+                  {user.registration_fee_paid ? 'Paid' : 'Unpaid'}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -251,17 +261,16 @@ const UserDetail = () => {
                           {transactions.map((transaction) => (
                             <div key={transaction.id} className="grid grid-cols-4 p-3">
                               <div>
-                                {transaction.type === 'deposit' && 'Deposit'}
-                                {transaction.type === 'withdraw' && 'Withdrawal'}
-                                {transaction.type === 'daily_bonus' && 'Daily Bonus'}
-                                {transaction.type === 'task_reward' && 'Task Reward'}
+                                {transaction.type.replace('_', ' ').toUpperCase()}
                               </div>
                               <div className={`${
-                                transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
+                                transaction.type === 'withdraw' || transaction.type === 'admin_debit' 
+                                  ? 'text-red-600' 
+                                  : 'text-green-600'
                               }`}>
-                                ₦{transaction.amount.toLocaleString()}
+                                ₦{Number(transaction.amount || 0).toLocaleString()}
                               </div>
-                              <div>{transaction.date}</div>
+                              <div>{new Date(transaction.created_at).toLocaleDateString()}</div>
                               <div>
                                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                   transaction.status === 'completed' 
@@ -292,32 +301,11 @@ const UserDetail = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <h4 className="font-medium">Account Status</h4>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" onClick={handleSuspendUser}>Suspend User</Button>
-                        <Button variant="destructive" onClick={handleDeleteAccount}>Delete Account</Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
                       <h4 className="font-medium">Balance Adjustment</h4>
                       <div className="flex space-x-2">
                         <Button variant="outline" onClick={handleAddFunds}>Add Funds</Button>
                         <Button variant="outline" onClick={handleDeductFunds}>Deduct Funds</Button>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Pending Transactions</h4>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" onClick={handleApproveTransactions}>Approve All</Button>
-                        <Button variant="outline" onClick={handleRejectTransactions}>Reject All</Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Send Notification</h4>
-                      <Button variant="outline" onClick={handleSendMessage}>Send Message</Button>
                     </div>
                   </CardContent>
                 </Card>
