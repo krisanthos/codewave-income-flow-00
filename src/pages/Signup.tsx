@@ -100,7 +100,7 @@ const Signup = () => {
         throw new Error('An account with this phone number already exists');
       }
 
-      // Create the user account with email confirmation disabled initially
+      // Create the user account but don't confirm email yet
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -118,7 +118,7 @@ const Signup = () => {
       if (data.user) {
         toast({
           title: "Account created!",
-          description: "Redirecting to payment...",
+          description: "Please complete payment of ₦5,000 to activate your account.",
         });
 
         // Store user data temporarily for after payment
@@ -129,9 +129,9 @@ const Signup = () => {
           phone: formData.phoneNumber
         }));
 
-        // Redirect to payment with return URL
+        // Redirect to payment with return URL - Updated to ₦5,000 payment link
         const returnUrl = encodeURIComponent(`${window.location.origin}/signup?payment_success=true`);
-        window.location.href = `https://paystack.shop/pay/cb5bkq1xb5?callback_url=${returnUrl}`;
+        window.location.href = `https://paystack.shop/pay/registration-fee-5000?callback_url=${returnUrl}`;
       }
     } catch (error: any) {
       toast({
@@ -171,7 +171,7 @@ const Signup = () => {
             </CardDescription>
             <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
               <p className="text-sm text-green-800 font-medium">
-                🎉 Get ₦2,500 welcome bonus after payment!
+                🎉 Pay ₦5,000 registration fee to get ₦2,500 welcome bonus!
               </p>
             </div>
           </CardHeader>
@@ -249,7 +249,7 @@ const Signup = () => {
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 disabled={isLoading}
               >
-                {isLoading ? "Creating account..." : "Create Account & Pay"}
+                {isLoading ? "Creating account..." : "Create Account & Pay ₦5,000"}
               </Button>
             </CardFooter>
           </form>

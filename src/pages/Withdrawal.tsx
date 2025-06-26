@@ -27,7 +27,7 @@ const Withdrawal = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const WITHDRAWAL_LIMIT = 45000; // Updated to ₦45,000
+  const WITHDRAWAL_LIMIT = 21450; // Updated to ₦21,450
 
   useEffect(() => {
     if (!user) {

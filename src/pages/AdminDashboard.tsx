@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Menu, X, BarChart, Users, LogOut, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Users, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,9 +13,11 @@ interface User {
   id: string;
   full_name: string;
   email: string;
-  balance: number;
-  created_at: string;
   phone: string;
+  created_at: string;
+  balance: number;
+  total_earned: number;
+  registration_fee_paid: boolean;
 }
 
 interface Transaction {
@@ -25,41 +27,41 @@ interface Transaction {
   amount: number;
   created_at: string;
   status: string;
-  profiles?: {
-    full_name: string;
-  };
+  user_name: string;
 }
 
-interface Stats {
-  totalUsers: number;
-  totalTransactions: number;
-  totalBalance: number;
-  avgDailyEarnings: number;
+interface Withdrawal {
+  id: string;
+  user_id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  user_name: string;
+  bank_details: any;
 }
 
 const AdminDashboard = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [stats, setStats] = useState<Stats>({
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [stats, setStats] = useState({
     totalUsers: 0,
-    totalTransactions: 0,
     totalBalance: 0,
-    avgDailyEarnings: 0,
+    totalEarnings: 0,
+    pendingWithdrawals: 0
   });
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
-    const checkAdminAccess = async () => {
+    const checkAdminAndFetchData = async () => {
+      // Check admin access
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate('/admin-auth');
         return;
       }
 
-      // Verify admin access
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -72,346 +74,378 @@ const AdminDashboard = () => {
           description: "Admin privileges required",
           variant: "destructive",
         });
-        await supabase.auth.signOut();
         navigate('/admin-auth');
         return;
       }
 
-      fetchAdminData();
+      await fetchDashboardData();
     };
 
-    checkAdminAccess();
+    checkAdminAndFetchData();
   }, [navigate]);
 
-  const fetchAdminData = async () => {
+  const fetchDashboardData = async () => {
     try {
       // Fetch users
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, balance, created_at, phone')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (usersError) throw usersError;
-      
       setUsers(usersData || []);
-      
-      // Fetch transactions with user info
+
+      // Fetch recent transactions with user names
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
         .select(`
-          id,
-          user_id,
-          type,
-          amount,
-          created_at,
-          status,
+          *,
           profiles!inner(full_name)
         `)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(10);
 
       if (transactionsError) throw transactionsError;
       
-      setTransactions(transactionsData || []);
+      const formattedTransactions = (transactionsData || []).map(transaction => ({
+        id: transaction.id,
+        user_id: transaction.user_id,
+        type: transaction.type,
+        amount: transaction.amount,
+        created_at: transaction.created_at,
+        status: transaction.status,
+        user_name: transaction.profiles?.full_name || 'Unknown User'
+      }));
       
+      setTransactions(formattedTransactions);
+
+      // Fetch pending withdrawals with user names
+      const { data: withdrawalsData, error: withdrawalsError } = await supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          profiles!inner(full_name),
+          bank_accounts!inner(bank_name, account_number, account_name)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (withdrawalsError) throw withdrawalsError;
+      
+      const formattedWithdrawals = (withdrawalsData || []).map(withdrawal => ({
+        id: withdrawal.id,
+        user_id: withdrawal.user_id,
+        amount: withdrawal.amount,
+        status: withdrawal.status,
+        created_at: withdrawal.created_at,
+        user_name: withdrawal.profiles?.full_name || 'Unknown User',
+        bank_details: withdrawal.bank_accounts
+      }));
+      
+      setWithdrawals(formattedWithdrawals);
+
       // Calculate stats
       const totalUsers = usersData?.length || 0;
-      const totalTransactions = transactionsData?.length || 0;
       const totalBalance = usersData?.reduce((sum, user) => sum + (Number(user.balance) || 0), 0) || 0;
-      
-      // Simple calculation for average daily earnings
-      const avgDailyEarnings = Math.round(totalBalance * 0.05);
-      
+      const totalEarnings = usersData?.reduce((sum, user) => sum + (Number(user.total_earned) || 0), 0) || 0;
+      const pendingWithdrawals = formattedWithdrawals.length;
+
       setStats({
         totalUsers,
-        totalTransactions,
         totalBalance,
-        avgDailyEarnings,
+        totalEarnings,
+        pendingWithdrawals
       });
+
     } catch (error: any) {
-      console.error("Error fetching admin data:", error);
+      console.error('Error fetching dashboard data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load admin dashboard data: " + error.message,
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load dashboard data: ' + error.message,
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
+
+  const handleApproveWithdrawal = async (withdrawalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({ status: 'approved' })
+        .eq('id', withdrawalId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Withdrawal approved successfully',
+      });
+
+      // Refresh data
+      await fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to approve withdrawal: ' + error.message,
+        variant: 'destructive',
+      });
+    }
   };
-  
+
+  const handleRejectWithdrawal = async (withdrawalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({ status: 'rejected' })
+        .eq('id', withdrawalId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Withdrawal rejected successfully',
+      });
+
+      // Refresh data
+      await fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reject withdrawal: ' + error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/admin-auth');
   };
-  
-  // Filter users based on search term
-  const filteredUsers = users.filter(user => 
-    user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
-  // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-700">Loading admin dashboard...</h2>
-          <p className="text-gray-500 mt-2">Please wait while we fetch the data</p>
+          <p className="text-gray-500 mt-2">Please wait</p>
         </div>
       </div>
     );
   }
-  
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      {/* Navigation */}
-      <nav className="bg-gray-900 text-white">
+    <div className="min-h-screen bg-gray-100">
+      <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <span className="text-xl font-bold">CodeWave Admin</span>
-            </div>
-            <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
-              <span className="px-3 py-2 rounded-md text-sm font-medium">
-                System Administration
-              </span>
-              <Button variant="ghost" onClick={handleLogout} className="text-white hover:bg-gray-700">
-                <LogOut className="mr-2" size={16} />
-                Logout
-              </Button>
-            </div>
-            <div className="flex items-center md:hidden">
-              <button
-                onClick={toggleMenu}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700"
-              >
-                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-            </div>
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
+            <Button onClick={handleLogout} variant="outline">
+              Logout
+            </Button>
           </div>
         </div>
+      </div>
 
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden bg-gray-800 shadow-lg">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              <div className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-700">
-                Dashboard
-              </div>
-              <button onClick={handleLogout} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-700">
-                Logout
-              </button>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      {/* Main content */}
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-6">Admin Dashboard</h1>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalUsers}</div>
+            </CardContent>
+          </Card>
           
-          {/* Overview stats */}
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Users</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalUsers}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Transactions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalTransactions}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Balance (All Users)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₦{stats.totalBalance.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Platform Health</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">Active</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tabs for users and transactions */}
-          <div className="mt-8">
-            <Tabs defaultValue="users" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="users">Users</TabsTrigger>
-                <TabsTrigger value="transactions">Recent Transactions</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="users" className="mt-6">
-                <Card>
-                  <CardHeader className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                    <div>
-                      <CardTitle>All Users</CardTitle>
-                      <CardDescription>
-                        Manage and view user details
-                      </CardDescription>
-                    </div>
-                    <div className="relative w-full sm:w-64">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-                      <Input
-                        placeholder="Search users..."
-                        className="pl-8"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="overflow-auto">
-                    {filteredUsers.length > 0 ? (
-                      <div className="rounded-md border">
-                        <div className="hidden md:grid md:grid-cols-5 border-b bg-gray-50 p-3 font-medium">
-                          <div>Name</div>
-                          <div>Email</div>
-                          <div>Phone</div>
-                          <div className="text-right">Balance</div>
-                          <div className="text-right">Actions</div>
-                        </div>
-                        <div className="divide-y">
-                          {filteredUsers.map((user) => (
-                            <div key={user.id} className="p-3">
-                              {/* Mobile view (card style) */}
-                              <div className="md:hidden space-y-2">
-                                <div className="flex justify-between">
-                                  <span className="font-medium">{user.full_name || 'No name'}</span>
-                                  <span className="text-green-600 font-medium">₦{Number(user.balance || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="text-gray-500 text-sm">{user.email}</div>
-                                <div className="text-gray-500 text-sm">{user.phone || 'No phone'}</div>
-                                <Link to={`/admin-user/${user.id}`}>
-                                  <Button size="sm" className="w-full mt-2">View Details</Button>
-                                </Link>
-                              </div>
-                              
-                              {/* Desktop view (table style) */}
-                              <div className="hidden md:grid md:grid-cols-5 items-center">
-                                <div className="font-medium">{user.full_name || 'No name'}</div>
-                                <div className="text-gray-500">{user.email}</div>
-                                <div className="text-gray-500">{user.phone || 'No phone'}</div>
-                                <div className="text-right">₦{Number(user.balance || 0).toLocaleString()}</div>
-                                <div className="text-right">
-                                  <Link to={`/admin-user/${user.id}`}>
-                                    <Button size="sm">View Details</Button>
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-8 text-center text-gray-500">
-                        {searchTerm ? "No users match your search" : "No users registered yet"}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="transactions" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Transactions</CardTitle>
-                    <CardDescription>
-                      All financial activities across the platform
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="overflow-auto">
-                    {transactions.length > 0 ? (
-                      <div className="rounded-md border">
-                        <div className="hidden md:grid md:grid-cols-5 border-b bg-gray-50 p-3 font-medium">
-                          <div>User</div>
-                          <div>Type</div>
-                          <div>Amount</div>
-                          <div>Date</div>
-                          <div>Status</div>
-                        </div>
-                        <div className="divide-y">
-                          {transactions.map((transaction) => (
-                            <div key={transaction.id} className="p-3">
-                              {/* Mobile view (card style) */}
-                              <div className="md:hidden space-y-2">
-                                <div className="flex justify-between">
-                                  <span className="font-medium">{transaction.profiles?.full_name || 'Unknown User'}</span>
-                                  <span className={`${
-                                    transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
-                                  } font-medium`}>
-                                    ₦{Number(transaction.amount || 0).toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span>{transaction.type.replace('_', ' ').toUpperCase()}</span>
-                                  <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
-                                </div>
-                                <div>
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                    transaction.status === 'completed' 
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {transaction.status}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              {/* Desktop view (table style) */}
-                              <div className="hidden md:grid md:grid-cols-5 items-center">
-                                <div className="font-medium">{transaction.profiles?.full_name || 'Unknown User'}</div>
-                                <div>{transaction.type.replace('_', ' ').toUpperCase()}</div>
-                                <div className={`${
-                                  transaction.type === 'withdraw' ? 'text-red-600' : 'text-green-600'
-                                }`}>
-                                  ₦{Number(transaction.amount || 0).toLocaleString()}
-                                </div>
-                                <div>{new Date(transaction.created_at).toLocaleDateString()}</div>
-                                <div>
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                    transaction.status === 'completed' 
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {transaction.status}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-8 text-center text-gray-500">
-                        No transactions recorded yet
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₦{stats.totalBalance.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₦{stats.totalEarnings.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Withdrawals</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingWithdrawals}</div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
+
+        {/* Main Content */}
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Users</CardTitle>
+                <CardDescription>
+                  Manage user accounts and view their details
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-6 border-b bg-gray-50 p-3 font-medium">
+                    <div>Name</div>
+                    <div>Email</div>
+                    <div>Phone</div>
+                    <div>Balance</div>
+                    <div>Status</div>
+                    <div>Actions</div>
+                  </div>
+                  <div className="divide-y">
+                    {users.map((user) => (
+                      <div key={user.id} className="grid grid-cols-6 p-3">
+                        <div>{user.full_name || 'No name'}</div>
+                        <div>{user.email}</div>
+                        <div>{user.phone || 'No phone'}</div>
+                        <div>₦{Number(user.balance || 0).toLocaleString()}</div>
+                        <div>
+                          <Badge variant={user.registration_fee_paid ? "default" : "destructive"}>
+                            {user.registration_fee_paid ? 'Active' : 'Pending'}
+                          </Badge>
+                        </div>
+                        <div>
+                          <Link to={`/admin/users/${user.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Details
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="transactions" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>
+                  Latest financial activities across all users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-5 border-b bg-gray-50 p-3 font-medium">
+                    <div>User</div>
+                    <div>Type</div>
+                    <div>Amount</div>
+                    <div>Status</div>
+                    <div>Date</div>
+                  </div>
+                  <div className="divide-y">
+                    {transactions.map((transaction) => (
+                      <div key={transaction.id} className="grid grid-cols-5 p-3">
+                        <div>{transaction.user_name}</div>
+                        <div className="capitalize">{transaction.type.replace('_', ' ')}</div>
+                        <div className={`${
+                          transaction.type.includes('withdraw') || transaction.type.includes('debit')
+                            ? 'text-red-600' 
+                            : 'text-green-600'
+                        }`}>
+                          ₦{Number(transaction.amount).toLocaleString()}
+                        </div>
+                        <div>
+                          <Badge variant={transaction.status === 'completed' ? "default" : "secondary"}>
+                            {transaction.status}
+                          </Badge>
+                        </div>
+                        <div>{new Date(transaction.created_at).toLocaleDateString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="withdrawals" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Withdrawals</CardTitle>
+                <CardDescription>
+                  Review and approve withdrawal requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {withdrawals.map((withdrawal) => (
+                    <div key={withdrawal.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">{withdrawal.user_name}</h3>
+                          <p className="text-sm text-gray-600">
+                            Amount: ₦{Number(withdrawal.amount).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Bank: {withdrawal.bank_details?.bank_name} - {withdrawal.bank_details?.account_number}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Account Name: {withdrawal.bank_details?.account_name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Requested: {new Date(withdrawal.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleApproveWithdrawal(withdrawal.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleRejectWithdrawal(withdrawal.id)}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {withdrawals.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No pending withdrawals
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };
