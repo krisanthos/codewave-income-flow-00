@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -44,7 +43,49 @@ const Deposit = () => {
     };
 
     fetchUserProfile();
+
+    // Check for deposit payment success
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+    const depositId = urlParams.get('deposit_id');
+    
+    if (paymentSuccess === 'true' && depositId) {
+      handleDepositPaymentSuccess(depositId);
+    }
   }, [user, navigate]);
+
+  const handleDepositPaymentSuccess = async (depositId: string) => {
+    try {
+      // Create payment approval record for deposit
+      const { error: approvalError } = await supabase
+        .from('payments_for_approval')
+        .insert({
+          user_id: user?.id,
+          payment_type: 'deposit',
+          amount: parseFloat(amount || '0'),
+          payment_confirmed: true,
+          reference_id: depositId
+        });
+
+      if (approvalError) throw approvalError;
+
+      toast({
+        title: "Deposit payment confirmed!",
+        description: "Your deposit has been submitted for admin approval. Funds will be added once approved.",
+      });
+
+      // Clear URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+      setAmount('');
+    } catch (error: any) {
+      console.error('Deposit confirmation error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm deposit: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const calculateTaxAndNet = (depositAmount: number) => {
     // No tax for amounts up to 5000 for new users, or if total_earned is 0
@@ -87,7 +128,7 @@ const Deposit = () => {
     try {
       const { taxAmount, netAmount } = calculateTaxAndNet(depositAmount);
 
-      // Create deposit record
+      // Create deposit record with pending status
       const { data: depositData, error: depositError } = await supabase
         .from('deposits')
         .insert({
@@ -102,7 +143,7 @@ const Deposit = () => {
 
       if (depositError) throw depositError;
 
-      // Create transaction record
+      // Create transaction record with pending status
       const { error: transactionError } = await supabase
         .from('transactions')
         .insert({
@@ -110,7 +151,7 @@ const Deposit = () => {
           type: 'deposit',
           amount: depositAmount,
           status: 'pending',
-          description: `Deposit via Paystack - Tax: ₦${taxAmount.toFixed(2)}`,
+          description: `Deposit via Paystack - Tax: ₦${taxAmount.toFixed(2)} - Requires admin approval`,
           currency: 'NGN',
           reference_id: depositData.id
         });
@@ -119,20 +160,16 @@ const Deposit = () => {
 
       toast({
         title: "Redirecting to payment",
-        description: "You will be redirected to complete your deposit",
+        description: "Complete payment for admin review and approval",
       });
 
       // Create Paystack payment URL with amount in kobo (multiply by 100)
       const paystackAmount = Math.round(depositAmount * 100);
-      const paystackUrl = `${PAYSTACK_BASE_LINK}?amount=${paystackAmount}&currency=NGN&reference=${depositData.id}&email=${user.email}`;
+      const returnUrl = encodeURIComponent(`${window.location.origin}/deposit?payment_success=true&deposit_id=${depositData.id}`);
+      const paystackUrl = `${PAYSTACK_BASE_LINK}?amount=${paystackAmount}&currency=NGN&reference=${depositData.id}&email=${user.email}&callback_url=${returnUrl}`;
       
       // Redirect to Paystack
-      window.open(paystackUrl, '_blank');
-
-      // Navigate back to dashboard after a short delay
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
+      window.location.href = paystackUrl;
 
     } catch (error: any) {
       toast({
@@ -190,7 +227,7 @@ const Deposit = () => {
                   Make Deposit
                 </CardTitle>
                 <CardDescription>
-                  Deposit funds to earn 2.5% daily returns per ₦10,000
+                  Deposit funds to earn 2.5% daily returns per ₦10,000 (requires admin approval)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -220,22 +257,28 @@ const Deposit = () => {
                         </div>
                       )}
                       <div className="flex justify-between font-medium border-t pt-2">
-                        <span>Net Deposit:</span>
-                        <span className="text-green-600">₦{netAmount.toFixed(2)}</span>
+                        <span>Net Deposit (Pending Approval):</span>
+                        <span className="text-orange-600">₦{netAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm text-blue-600 border-t pt-2">
-                        <span>Daily Earnings (2.5%):</span>
+                        <span>Daily Earnings (After Approval):</span>
                         <span>₦{((netAmount / 10000) * 0.025 * 10000).toFixed(2)}</span>
                       </div>
                     </div>
                   )}
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ All deposits require admin approval before funds are added to your balance
+                    </p>
+                  </div>
 
                   <Button 
                     onClick={handleDeposit} 
                     className="w-full" 
                     disabled={isLoading || !amount || depositAmount <= 0}
                   >
-                    {isLoading ? "Processing..." : "Proceed to Payment"}
+                    {isLoading ? "Processing..." : "Pay & Submit for Approval"}
                   </Button>
                 </div>
               </CardContent>
@@ -268,11 +311,30 @@ const Deposit = () => {
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900">Processing Time</h4>
-                    <p className="text-sm text-gray-600">Deposits are processed instantly after payment confirmation</p>
+                    <p className="text-sm text-gray-600">Deposits require admin approval after payment confirmation</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900">Example</h4>
-                    <p className="text-sm text-gray-600">₦10,000 deposit = ₦250 daily earnings</p>
+                    <p className="text-sm text-gray-600">₦10,000 deposit = ₦250 daily earnings (after approval)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Admin Approval Process</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <h4 className="font-medium text-blue-800">How it works:</h4>
+                    <ol className="text-sm text-blue-700 mt-2 space-y-1">
+                      <li>1. Complete payment via Paystack</li>
+                      <li>2. Admin reviews your payment</li>
+                      <li>3. Once approved, funds are added to your balance</li>
+                      <li>4. Daily earnings start immediately after approval</li>
+                    </ol>
                   </div>
                 </div>
               </CardContent>
@@ -326,8 +388,8 @@ const Deposit = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">
-                  Your payment is secured by Paystack. You'll be redirected to complete the transaction.
-                  After successful payment, your balance will be automatically updated with the net amount.
+                  Your payment is secured by Paystack. After successful payment, your deposit will be submitted for admin approval.
+                  Funds will be added to your balance once the admin approves your deposit.
                 </p>
               </div>
               <div className="text-right">

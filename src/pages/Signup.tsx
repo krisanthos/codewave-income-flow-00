@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,12 +36,55 @@ const Signup = () => {
 
     // Handle payment success return
     if (paymentSuccess === 'true') {
-      toast({
-        title: "Payment successful!",
-        description: "Please check your email for a confirmation link to activate your account.",
-      });
+      handlePaymentSuccess();
     }
   }, [navigate, paymentSuccess]);
+
+  const handlePaymentSuccess = async () => {
+    try {
+      // Get stored user data
+      const pendingUserData = localStorage.getItem('pendingUserData');
+      if (!pendingUserData) {
+        toast({
+          title: "Error",
+          description: "No pending registration data found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userData = JSON.parse(pendingUserData);
+      
+      // Create payment approval record
+      const { error: approvalError } = await supabase
+        .from('payments_for_approval')
+        .insert({
+          user_id: userData.userId,
+          payment_type: 'registration',
+          amount: 5000,
+          payment_confirmed: true, // Payment was successful
+          reference_id: userData.userId
+        });
+
+      if (approvalError) throw approvalError;
+
+      // Clear stored data
+      localStorage.removeItem('pendingUserData');
+
+      toast({
+        title: "Payment confirmed!",
+        description: "Your registration payment has been submitted for admin approval. You'll be notified once approved.",
+      });
+
+    } catch (error: any) {
+      console.error('Payment confirmation error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm payment: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -118,7 +160,7 @@ const Signup = () => {
       if (data.user) {
         toast({
           title: "Account created!",
-          description: "Please complete payment of ₦5,000 to activate your account.",
+          description: "Please complete payment of ₦5,000 to proceed with registration.",
         });
 
         // Store user data temporarily for after payment
@@ -169,9 +211,9 @@ const Signup = () => {
             <CardDescription>
               Create your account and complete payment to start earning
             </CardDescription>
-            <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
-              <p className="text-sm text-green-800 font-medium">
-                🎉 Pay ₦5,000 registration fee to get ₦2,500 welcome bonus!
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
+              <p className="text-sm text-yellow-800 font-medium">
+                ⚠️ Pay ₦5,000 registration fee - Admin approval required after payment
               </p>
             </div>
           </CardHeader>

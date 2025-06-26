@@ -131,6 +131,54 @@ export type Database = {
         }
         Relationships: []
       }
+      payments_for_approval: {
+        Row: {
+          admin_approved: boolean | null
+          admin_notes: string | null
+          admin_rejected: boolean | null
+          amount: number
+          created_at: string
+          id: string
+          payment_confirmed: boolean | null
+          payment_type: string
+          paystack_reference: string | null
+          processed_at: string | null
+          reference_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_approved?: boolean | null
+          admin_notes?: string | null
+          admin_rejected?: boolean | null
+          amount: number
+          created_at?: string
+          id?: string
+          payment_confirmed?: boolean | null
+          payment_type: string
+          paystack_reference?: string | null
+          processed_at?: string | null
+          reference_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_approved?: boolean | null
+          admin_notes?: string | null
+          admin_rejected?: boolean | null
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_confirmed?: boolean | null
+          payment_type?: string
+          paystack_reference?: string | null
+          processed_at?: string | null
+          reference_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -408,6 +456,14 @@ export type Database = {
           bank_name: string
           bank_code: string
         }[]
+      }
+      process_payment_approval: {
+        Args: {
+          approval_id: string
+          approved: boolean
+          admin_notes_text?: string
+        }
+        Returns: boolean
       }
       register_user: {
         Args: { user_email: string; user_password: string }

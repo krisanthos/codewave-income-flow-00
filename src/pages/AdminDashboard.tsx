@@ -1,11 +1,11 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Users, DollarSign, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -40,15 +40,33 @@ interface Withdrawal {
   bank_details: any;
 }
 
+interface PaymentApproval {
+  id: string;
+  user_id: string;
+  payment_type: string;
+  amount: number;
+  paystack_reference: string;
+  payment_confirmed: boolean;
+  admin_approved: boolean;
+  admin_rejected: boolean;
+  admin_notes: string;
+  created_at: string;
+  user_name: string;
+  user_email: string;
+}
+
 const AdminDashboard = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [paymentApprovals, setPaymentApprovals] = useState<PaymentApproval[]>([]);
+  const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalBalance: 0,
     totalEarnings: 0,
-    pendingWithdrawals: 0
+    pendingWithdrawals: 0,
+    pendingApprovals: 0
   });
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -179,17 +197,62 @@ const AdminDashboard = () => {
       
       setWithdrawals(formattedWithdrawals);
 
+      // Fetch pending payment approvals
+      const { data: approvalsData, error: approvalsError } = await supabase
+        .from('payments_for_approval')
+        .select('*')
+        .eq('payment_confirmed', true)
+        .eq('admin_approved', false)
+        .eq('admin_rejected', false)
+        .order('created_at', { ascending: false });
+
+      if (approvalsError) throw approvalsError;
+
+      // Get user details for approvals
+      const approvalUserIds = [...new Set(approvalsData?.map(a => a.user_id) || [])];
+      const { data: approvalUserProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', approvalUserIds);
+
+      const approvalUserMap = (approvalUserProfiles || []).reduce((acc, user) => {
+        acc[user.id] = {
+          name: user.full_name || 'Unknown User',
+          email: user.email || 'No email'
+        };
+        return acc;
+      }, {} as Record<string, any>);
+
+      const formattedApprovals = (approvalsData || []).map(approval => ({
+        id: approval.id,
+        user_id: approval.user_id,
+        payment_type: approval.payment_type,
+        amount: approval.amount,
+        paystack_reference: approval.paystack_reference,
+        payment_confirmed: approval.payment_confirmed,
+        admin_approved: approval.admin_approved,
+        admin_rejected: approval.admin_rejected,
+        admin_notes: approval.admin_notes,
+        created_at: approval.created_at,
+        user_name: approvalUserMap[approval.user_id]?.name || 'Unknown User',
+        user_email: approvalUserMap[approval.user_id]?.email || 'No email'
+      }));
+
+      setPaymentApprovals(formattedApprovals);
+
       // Calculate stats
       const totalUsers = usersData?.length || 0;
       const totalBalance = usersData?.reduce((sum, user) => sum + (Number(user.balance) || 0), 0) || 0;
       const totalEarnings = usersData?.reduce((sum, user) => sum + (Number(user.total_earned) || 0), 0) || 0;
       const pendingWithdrawals = formattedWithdrawals.length;
+      const pendingApprovals = formattedApprovals.length;
 
       setStats({
         totalUsers,
         totalBalance,
         totalEarnings,
-        pendingWithdrawals
+        pendingWithdrawals,
+        pendingApprovals
       });
 
     } catch (error: any) {
@@ -201,6 +264,34 @@ const AdminDashboard = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleProcessPaymentApproval = async (approvalId: string, approved: boolean) => {
+    try {
+      const notes = adminNotes[approvalId] || '';
+      
+      const { error } = await supabase.rpc('process_payment_approval', {
+        approval_id: approvalId,
+        approved: approved,
+        admin_notes_text: notes
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Payment ${approved ? 'approved' : 'rejected'} successfully`,
+      });
+
+      // Refresh data
+      await fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to process payment approval: ' + error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -285,7 +376,7 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -325,15 +416,101 @@ const AdminDashboard = () => {
               <div className="text-2xl font-bold">{stats.pendingWithdrawals}</div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Payment Approvals</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingApprovals}</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="users" className="space-y-4">
+        <Tabs defaultValue="approvals" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="approvals">Payment Approvals</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="approvals" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Payment Approvals</CardTitle>
+                <CardDescription>
+                  Review and approve deposit and registration payments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {paymentApprovals.map((approval) => (
+                    <div key={approval.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h3 className="font-medium">{approval.user_name}</h3>
+                            <Badge variant={approval.payment_type === 'registration' ? "default" : "secondary"}>
+                              {approval.payment_type === 'registration' ? 'Registration' : 'Deposit'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">Email: {approval.user_email}</p>
+                          <p className="text-sm text-gray-600">
+                            Amount: ₦{Number(approval.amount).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Paystack Reference: {approval.paystack_reference || 'N/A'}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Submitted: {new Date(approval.created_at).toLocaleString()}
+                          </p>
+                          
+                          <div className="mt-3">
+                            <Textarea
+                              placeholder="Add admin notes..."
+                              value={adminNotes[approval.id] || ''}
+                              onChange={(e) => setAdminNotes(prev => ({
+                                ...prev,
+                                [approval.id]: e.target.value
+                              }))}
+                              className="mb-2"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 ml-4">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleProcessPaymentApproval(approval.id, true)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleProcessPaymentApproval(approval.id, false)}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {paymentApprovals.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No pending payment approvals
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
           
           <TabsContent value="users" className="space-y-4">
             <Card>
