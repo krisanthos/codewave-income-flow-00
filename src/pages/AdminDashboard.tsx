@@ -95,18 +95,28 @@ const AdminDashboard = () => {
       if (usersError) throw usersError;
       setUsers(usersData || []);
 
-      // Fetch recent transactions with user names
+      // Fetch recent transactions
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
-        .select(`
-          *,
-          profiles!inner(full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (transactionsError) throw transactionsError;
-      
+
+      // Fetch user profiles to get names for transactions
+      const userIds = [...new Set(transactionsData?.map(t => t.user_id) || [])];
+      const { data: userProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      // Create a map of user_id to full_name
+      const userNameMap = (userProfiles || []).reduce((acc, user) => {
+        acc[user.id] = user.full_name || 'Unknown User';
+        return acc;
+      }, {} as Record<string, string>);
+
       const formattedTransactions = (transactionsData || []).map(transaction => ({
         id: transaction.id,
         user_id: transaction.user_id,
@@ -114,32 +124,57 @@ const AdminDashboard = () => {
         amount: transaction.amount,
         created_at: transaction.created_at,
         status: transaction.status,
-        user_name: transaction.profiles?.full_name || 'Unknown User'
+        user_name: userNameMap[transaction.user_id] || 'Unknown User'
       }));
       
       setTransactions(formattedTransactions);
 
-      // Fetch pending withdrawals with user names
+      // Fetch pending withdrawals
       const { data: withdrawalsData, error: withdrawalsError } = await supabase
         .from('withdrawals')
-        .select(`
-          *,
-          profiles!inner(full_name),
-          bank_accounts!inner(bank_name, account_number, account_name)
-        `)
+        .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (withdrawalsError) throw withdrawalsError;
-      
+
+      // Fetch bank account details for withdrawals
+      const bankAccountIds = [...new Set(withdrawalsData?.map(w => w.bank_account_id) || [])];
+      const { data: bankAccounts } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .in('id', bankAccountIds);
+
+      // Create a map of bank_account_id to bank details
+      const bankAccountMap = (bankAccounts || []).reduce((acc, account) => {
+        acc[account.id] = {
+          bank_name: account.bank_name,
+          account_number: account.account_number,
+          account_name: account.account_name
+        };
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Get user names for withdrawals
+      const withdrawalUserIds = [...new Set(withdrawalsData?.map(w => w.user_id) || [])];
+      const { data: withdrawalUserProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', withdrawalUserIds);
+
+      const withdrawalUserNameMap = (withdrawalUserProfiles || []).reduce((acc, user) => {
+        acc[user.id] = user.full_name || 'Unknown User';
+        return acc;
+      }, {} as Record<string, string>);
+
       const formattedWithdrawals = (withdrawalsData || []).map(withdrawal => ({
         id: withdrawal.id,
         user_id: withdrawal.user_id,
         amount: withdrawal.amount,
         status: withdrawal.status,
         created_at: withdrawal.created_at,
-        user_name: withdrawal.profiles?.full_name || 'Unknown User',
-        bank_details: withdrawal.bank_accounts
+        user_name: withdrawalUserNameMap[withdrawal.user_id] || 'Unknown User',
+        bank_details: bankAccountMap[withdrawal.bank_account_id] || {}
       }));
       
       setWithdrawals(formattedWithdrawals);
