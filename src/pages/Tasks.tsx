@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const Tasks = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [watchingAd, setWatchingAd] = useState(false);
+  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -32,23 +34,39 @@ const Tasks = () => {
 
     const fetchData = async () => {
       try {
-        // ✌️ Get user profile and tasks 🥀
-        const [profileResult, tasksResult] = await Promise.all([
-          supabase.rpc('get_current_user_profile'),
-          supabase
-            .from('tasks')
-            .select('*')
-            .eq('is_active', true)
-            .limit(20)
-        ]);
+        // Get user profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-        if (profileResult.data && profileResult.data.length > 0) {
-          setUserProfile(profileResult.data[0]);
+        if (profileData) {
+          setUserProfile(profileData);
         }
 
-        if (tasksResult.data) {
-          setTasks(tasksResult.data);
+        // Get available tasks
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('is_active', true)
+          .limit(20);
+
+        if (tasksData) {
+          setTasks(tasksData);
         }
+
+        // Get completed tasks for this user
+        const { data: completedTasksData } = await supabase
+          .from('user_tasks')
+          .select('task_id')
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+
+        if (completedTasksData) {
+          setCompletedTasks(new Set(completedTasksData.map(task => task.task_id)));
+        }
+
       } catch (error: any) {
         console.error("Error fetching data:", error);
         toast({
@@ -64,13 +82,12 @@ const Tasks = () => {
     fetchData();
   }, [user, navigate]);
 
-  // 💔 Handle watching ads and earning points ❤️‍🩹
   const handleWatchAd = async () => {
     if (!user || !userProfile) return;
 
     setWatchingAd(true);
     
-    // Simulate ad watching (in real implementation, this would be triggered after ad completion)
+    // Simulate ad watching
     setTimeout(async () => {
       try {
         const earnedPoints = Math.floor(Math.random() * 51) + 50; // 50-100 points
@@ -122,37 +139,30 @@ const Tasks = () => {
       } finally {
         setWatchingAd(false);
       }
-    }, 3000); // 3 second delay to simulate ad duration
+    }, 3000);
   };
 
   const handleTaskCompletion = async (taskId: string) => {
     if (!user || !userProfile) return;
 
+    // Check if task is already completed
+    if (completedTasks.has(taskId)) {
+      toast({
+        title: "Task already completed",
+        description: "You have already completed this task",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
 
-      // Check if user has already started this task
-      const { data: existingTask } = await supabase
-        .from('user_tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('task_id', taskId)
-        .single();
-
-      if (existingTask) {
-        toast({
-          title: "Task already completed",
-          description: "You have already completed this task",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Complete the task
+      // Complete the task - insert or update user_tasks
       const { error: taskError } = await supabase
         .from('user_tasks')
-        .insert({
+        .upsert({
           user_id: user.id,
           task_id: taskId,
           status: 'completed',
@@ -196,6 +206,8 @@ const Tasks = () => {
         total_earned: (prev.total_earned || 0) + task.points
       }));
 
+      setCompletedTasks(prev => new Set([...prev, taskId]));
+
       toast({
         title: "Task completed! 🎉",
         description: `₦${task.points} has been added to your wallet`,
@@ -206,6 +218,71 @@ const Tasks = () => {
       toast({
         title: "Error",
         description: "Failed to complete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSocialFollow = async (platform: string) => {
+    const points = 25;
+    const taskId = `social-${platform}`;
+    
+    // Check if already completed
+    if (completedTasks.has(taskId)) {
+      toast({
+        title: "Already completed",
+        description: "You have already followed this account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update user balance
+      const newBalance = (userProfile.balance || 0) + points;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          balance: newBalance,
+          total_earned: (userProfile.total_earned || 0) + points
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'task_reward',
+          amount: points,
+          status: 'completed',
+          description: `Social media follow reward - ${platform}`,
+          currency: 'NGN'
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update local state
+      setUserProfile(prev => ({
+        ...prev,
+        balance: newBalance,
+        total_earned: (prev.total_earned || 0) + points
+      }));
+
+      setCompletedTasks(prev => new Set([...prev, taskId]));
+
+      toast({
+        title: "Follow completed! 🎉",
+        description: `₦${points} has been added to your wallet`,
+      });
+
+    } catch (error: any) {
+      console.error("Error processing follow reward:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process reward. Please try again.",
         variant: "destructive",
       });
     }
@@ -224,7 +301,7 @@ const Tasks = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header 💔❤️‍🩹 */}
+      {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -244,7 +321,7 @@ const Tasks = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Watch Ads Section ✌️🥀 */}
+        {/* Watch Ads Section */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -294,7 +371,7 @@ const Tasks = () => {
           </CardContent>
         </Card>
 
-        {/* Social Media Tasks 💔❤️‍🩹 */}
+        {/* Social Media Tasks */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Social Media Tasks</CardTitle>
@@ -310,12 +387,16 @@ const Tasks = () => {
                 <p className="text-sm text-gray-600 mb-3">Earn ₦25</p>
                 <Button 
                   size="sm" 
-                  variant="outline"
-                  onClick={() => window.open('https://www.facebook.com/profile.php?id=61576663620789', '_blank')}
+                  variant={completedTasks.has('social-facebook') ? "secondary" : "outline"}
+                  onClick={() => {
+                    window.open('https://www.facebook.com/profile.php?id=61576663620789', '_blank');
+                    handleSocialFollow('facebook');
+                  }}
                   className="w-full"
+                  disabled={completedTasks.has('social-facebook')}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Follow
+                  {completedTasks.has('social-facebook') ? 'Completed' : 'Follow'}
                 </Button>
               </div>
               
@@ -343,7 +424,7 @@ const Tasks = () => {
                   className="w-full"
                   disabled
                 >
-                  Coming Soon
+                  Coming Soon  
                 </Button>
               </div>
             </div>
@@ -376,8 +457,10 @@ const Tasks = () => {
                           size="sm"
                           className="mt-2 bg-green-600 hover:bg-green-700"
                           onClick={() => handleTaskCompletion(task.id)}
+                          disabled={completedTasks.has(task.id)}
+                          variant={completedTasks.has(task.id) ? "secondary" : "default"}
                         >
-                          Complete Task
+                          {completedTasks.has(task.id) ? 'Completed' : 'Complete Task'}
                         </Button>
                       </div>
                     </div>
