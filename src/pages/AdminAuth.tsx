@@ -13,6 +13,10 @@ const AdminAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   
+  // Admin emails and password
+  const ADMIN_EMAILS = ['sebestianarchibald@gmail.com', 'victorycrisantos@gmail.com'];
+  const ADMIN_PASSWORD = '@Anonymousfemboy2025';
+  
   useEffect(() => {
     // Check if user is already logged in as admin
     const checkAdminAuth = async () => {
@@ -25,7 +29,7 @@ const AdminAuth = () => {
           .eq('id', session.user.id)
           .single();
         
-        if (profile && profile.email === 'admin@codewave.com') {
+        if (profile && ADMIN_EMAILS.includes(profile.email)) {
           navigate('/admin-dashboard');
         }
       }
@@ -40,6 +44,26 @@ const AdminAuth = () => {
       toast({
         title: "Missing fields",
         description: "Please enter both email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if email is one of the admin emails
+    if (!ADMIN_EMAILS.includes(email.toLowerCase())) {
+      toast({
+        title: "Access denied",
+        description: "Invalid admin credentials",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if password matches
+    if (password !== ADMIN_PASSWORD) {
+      toast({
+        title: "Access denied",
+        description: "Invalid admin credentials",
         variant: "destructive",
       });
       return;
@@ -64,7 +88,7 @@ const AdminAuth = () => {
           .eq('id', data.user.id)
           .single();
         
-        if (!profile || profile.email !== 'admin@codewave.com') {
+        if (!profile || !ADMIN_EMAILS.includes(profile.email)) {
           await supabase.auth.signOut();
           throw new Error('Access denied: Admin privileges required');
         }
