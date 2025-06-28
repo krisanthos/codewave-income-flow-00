@@ -1,4 +1,3 @@
-
 /**
  * Payment utility functions for the application
  * Now integrated with Supabase for user management
@@ -7,8 +6,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-// ✌️ Test mode flag - set to false for production 💔
-export const TEST_MODE = false;
+// ✌️ Test mode flag - set to true for testing 💔
+export const TEST_MODE = true;
 
 /**
  * Opens the Paystack payment page for subsequent payments (withdrawals, etc.)
