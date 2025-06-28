@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const paymentSuccess = searchParams.get('payment_success');
+  const paymentReference = searchParams.get('reference');
 
   useEffect(() => {
     // Check if user is already logged in
@@ -34,14 +35,16 @@ const Signup = () => {
     };
     checkAuth();
 
-    // Handle payment success return
-    if (paymentSuccess === 'true') {
-      handlePaymentSuccess();
+    // Handle payment return with reference
+    if (paymentReference) {
+      handlePaymentReturn(paymentReference);
     }
-  }, [navigate, paymentSuccess]);
+  }, [navigate, paymentReference]);
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentReturn = async (reference: string) => {
     try {
+      setIsLoading(true);
+      
       // Get stored user data
       const pendingUserData = localStorage.getItem('pendingUserData');
       if (!pendingUserData) {
@@ -55,34 +58,42 @@ const Signup = () => {
 
       const userData = JSON.parse(pendingUserData);
       
-      // Create payment approval record
-      const { error: approvalError } = await supabase
-        .from('payments_for_approval')
-        .insert({
-          user_id: userData.userId,
-          payment_type: 'registration',
-          amount: 5000,
-          payment_confirmed: true, // Payment was successful
-          reference_id: userData.userId
+      // Verify payment and create account
+      const { data, error } = await supabase.functions.invoke('verify-paystack-payment', {
+        body: {
+          reference: reference,
+          userData: userData
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Clear stored data
+        localStorage.removeItem('pendingUserData');
+
+        toast({
+          title: "Registration Successful!",
+          description: data.message,
         });
 
-      if (approvalError) throw approvalError;
-
-      // Clear stored data
-      localStorage.removeItem('pendingUserData');
-
-      toast({
-        title: "Payment confirmed!",
-        description: "Your registration payment has been submitted for admin approval. You'll be notified once approved.",
-      });
+        // Redirect to login after a brief delay
+        setTimeout(() => {
+          navigate('/auth?message=registration_complete');
+        }, 2000);
+      } else {
+        throw new Error(data.error || 'Payment verification failed');
+      }
 
     } catch (error: any) {
-      console.error('Payment confirmation error:', error);
+      console.error('Payment verification error:', error);
       toast({
-        title: "Error",
-        description: "Failed to confirm payment: " + error.message,
+        title: "Verification Failed",
+        description: error.message || "Failed to verify payment. Please contact support.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -120,64 +131,26 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      // Check if email already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', formData.email)
-        .single();
-
-      if (existingUser) {
-        throw new Error('An account with this email already exists');
-      }
-
-      // Check if phone number already exists
-      const { data: existingPhone } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('phone', formData.phoneNumber)
-        .single();
-
-      if (existingPhone) {
-        throw new Error('An account with this phone number already exists');
-      }
-
-      // Create the user account but don't confirm email yet
-      const { data, error } = await supabase.auth.signUp({
+      // Store user data temporarily for after payment
+      localStorage.setItem('pendingUserData', JSON.stringify({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            phone: formData.phoneNumber,
-          },
-          emailRedirectTo: `${window.location.origin}/login?confirmed=true`
-        }
+        fullName: formData.fullName,
+        phoneNumber: formData.phoneNumber
+      }));
+
+      toast({
+        title: "Redirecting to Payment",
+        description: "Complete your ₦5,000 registration payment to create your account.",
       });
 
-      if (error) throw error;
+      // Redirect to new Paystack payment link with return URL
+      const returnUrl = encodeURIComponent(`${window.location.origin}/signup`);
+      window.location.href = `https://paystack.shop/pay/cjq84w--6d?callback_url=${returnUrl}`;
 
-      if (data.user) {
-        toast({
-          title: "Account created!",
-          description: "Please complete payment of ₦5,000 to proceed with registration.",
-        });
-
-        // Store user data temporarily for after payment
-        localStorage.setItem('pendingUserData', JSON.stringify({
-          userId: data.user.id,
-          email: formData.email,
-          fullName: formData.fullName,
-          phone: formData.phoneNumber
-        }));
-
-        // Redirect to payment with return URL - Updated to ₦5,000 payment link
-        const returnUrl = encodeURIComponent(`${window.location.origin}/signup?payment_success=true`);
-        window.location.href = `https://paystack.shop/pay/registration-fee-5000?callback_url=${returnUrl}`;
-      }
     } catch (error: any) {
       toast({
-        title: "Registration failed",
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
@@ -209,11 +182,11 @@ const Signup = () => {
           <CardHeader>
             <CardTitle className="text-green-800">Join CodeWave</CardTitle>
             <CardDescription>
-              Create your account and complete payment to start earning
+              Complete payment to create your account and start earning
             </CardDescription>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
-              <p className="text-sm text-yellow-800 font-medium">
-                ⚠️ Pay ₦5,000 registration fee - Admin approval required after payment
+            <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
+              <p className="text-sm text-green-800 font-medium">
+                🎉 Pay ₦5,000 registration fee - Get ₦2,500 welcome bonus!
               </p>
             </div>
           </CardHeader>
@@ -291,7 +264,7 @@ const Signup = () => {
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 disabled={isLoading}
               >
-                {isLoading ? "Creating account..." : "Create Account & Pay ₦5,000"}
+                {isLoading ? "Processing..." : "Pay ₦5,000 & Create Account"}
               </Button>
             </CardFooter>
           </form>

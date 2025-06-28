@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const confirmed = searchParams.get('confirmed');
-  const paymentSuccess = searchParams.get('payment_success');
+  const message = searchParams.get('message');
 
   useEffect(() => {
     // Check if user is already logged in
@@ -46,14 +45,14 @@ const Auth = () => {
       });
     }
 
-    // Handle payment success return
-    if (paymentSuccess === 'true') {
+    // Handle registration complete message
+    if (message === 'registration_complete') {
       toast({
-        title: "Payment successful!",
-        description: "Please check your email for a confirmation link to activate your account.",
+        title: "Registration Complete!",
+        description: "Your account has been created. Please check your email and then log in.",
       });
     }
-  }, [navigate, confirmed, paymentSuccess]);
+  }, [navigate, confirmed, message]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,91 +86,13 @@ const Auth = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (signupData.password !== signupData.confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "Please ensure both passwords are the same.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!signupData.phone || !isValidPhoneNumber(signupData.phone)) {
-      toast({
-        title: "Invalid phone number",
-        description: "Please enter a valid phone number with country code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Check if email already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', signupData.email)
-        .single();
-
-      if (existingUser) {
-        throw new Error('An account with this email already exists');
-      }
-
-      // Check if phone number already exists
-      const { data: existingPhone } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('phone', signupData.phone)
-        .single();
-
-      if (existingPhone) {
-        throw new Error('An account with this phone number already exists');
-      }
-
-      // Create the user account
-      const { data, error } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
-        options: {
-          data: {
-            full_name: signupData.full_name,
-            phone: signupData.phone,
-          },
-          emailRedirectTo: `${window.location.origin}/login?confirmed=true`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        toast({
-          title: "Account created!",
-          description: "Redirecting to payment...",
-        });
-
-        // Store user data temporarily for after payment
-        localStorage.setItem('pendingUserData', JSON.stringify({
-          userId: data.user.id,
-          email: signupData.email,
-          fullName: signupData.full_name,
-          phone: signupData.phone
-        }));
-
-        // Redirect to payment with return URL
-        const returnUrl = encodeURIComponent(`${window.location.origin}/auth?payment_success=true`);
-        window.location.href = `https://paystack.shop/pay/cb5bkq1xb5?callback_url=${returnUrl}`;
-      }
-    } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    toast({
+      title: "Use the dedicated signup page",
+      description: "Please use the main signup page for registration with payment.",
+      variant: "destructive",
+    });
+    
+    navigate('/signup');
   };
 
   return (
@@ -186,159 +107,74 @@ const Auth = () => {
             <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-16" />
           </div>
           <h2 className="mt-2 text-center text-3xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Join CodeWave
+            Welcome to CodeWave
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Start earning money through social media engagement
+            Sign in to your account or{" "}
+            <Link to="/signup" className="font-medium text-green-600 hover:text-green-500">
+              create a new account
+            </Link>
           </p>
         </div>
 
         <Card className="bg-white/80 backdrop-blur-md shadow-xl border-green-100">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-green-50">
-              <TabsTrigger value="login" className="data-[state=active]:bg-white data-[state=active]:text-green-600">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="data-[state=active]:bg-white data-[state=active]:text-green-600">Sign Up</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin}>
-                <CardHeader>
-                  <CardTitle className="text-green-800">Welcome Back</CardTitle>
-                  <CardDescription>Sign in to your CodeWave account</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={loginData.email}
-                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                      required
-                      className="border-green-200 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                        required
-                        className="border-green-200 focus:border-green-500 pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                    disabled={isLoading}
+          <form onSubmit={handleLogin}>
+            <CardHeader>
+              <CardTitle className="text-green-800">Sign In</CardTitle>
+              <CardDescription>Access your CodeWave account</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={loginData.email}
+                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  required
+                  className="border-green-200 focus:border-green-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={loginData.password}
+                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    required
+                    className="border-green-200 focus:border-green-500 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                   >
-                    {isLoading ? "Signing in..." : "Sign In"}
-                  </Button>
-                </CardFooter>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup}>
-                <CardHeader>
-                  <CardTitle className="text-green-800">Create Account</CardTitle>
-                  <CardDescription>
-                    Join CodeWave and start earning today!
-                  </CardDescription>
-                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-2">
-                    <p className="text-sm text-green-800 font-medium">
-                      🎉 Get ₦2,500 welcome bonus after payment!
-                    </p>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name</Label>
-                    <Input
-                      id="full_name"
-                      value={signupData.full_name}
-                      onChange={(e) => setSignupData({ ...signupData, full_name: e.target.value })}
-                      required
-                      className="border-green-200 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup_email">Email</Label>
-                    <Input
-                      id="signup_email"
-                      type="email"
-                      value={signupData.email}
-                      onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                      required
-                      className="border-green-200 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <PhoneInput
-                      value={signupData.phone}
-                      onChange={(value) => setSignupData({ ...signupData, phone: value || "" })}
-                      placeholder="Enter phone number"
-                      className="border-green-200 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup_password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup_password"
-                        type={showPassword ? "text" : "password"}
-                        value={signupData.password}
-                        onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                        required
-                        className="border-green-200 focus:border-green-500 pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm_password">Confirm Password</Label>
-                    <Input
-                      id="confirm_password"
-                      type="password"
-                      value={signupData.confirmPassword}
-                      onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                      required
-                      className="border-green-200 focus:border-green-500"
-                    />
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Creating account..." : "Create Account & Pay"}
-                  </Button>
-                </CardFooter>
-              </form>
-            </TabsContent>
-          </Tabs>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-4">
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{" "}
+                  <Link to="/signup" className="font-medium text-green-600 hover:text-green-500">
+                    Create one here
+                  </Link>
+                </p>
+              </div>
+            </CardFooter>
+          </form>
         </Card>
       </div>
     </div>
