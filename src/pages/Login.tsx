@@ -1,64 +1,57 @@
 
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const confirmed = searchParams.get('confirmed');
-
-  useEffect(() => {
-    // Check if user is already logged in
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/dashboard');
-      }
-    };
-    checkAuth();
-
-    // Handle email confirmation
-    if (confirmed === 'true') {
-      toast({
-        title: "Email confirmed!",
-        description: "Your account has been activated. You can now log in and start earning!",
-      });
-    }
-  }, [navigate, confirmed]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    
+    if (!email || !password) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter both email and password",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    setIsLoading(true);
+    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
-
-      navigate('/dashboard');
+      if (data.user) {
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        navigate("/dashboard");
+      }
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: error.message,
+        description: error.message || "Invalid email or password",
         variant: "destructive",
       });
     } finally {
@@ -66,74 +59,126 @@ const Login = () => {
     }
   };
 
+  const fillDemoAccount = (demoNumber: 1 | 2) => {
+    setEmail(`demo${demoNumber}@codewave.com`);
+    setPassword("demo123password");
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <Link to="/" className="flex items-center justify-center text-gray-600 hover:text-gray-900 mb-6">
-            <ArrowLeft className="mr-2" size={16} />
-            Back to Home
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Back button */}
+        <div className="mb-4 sm:mb-6">
+          <Link to="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            <span className="text-sm">Back to home</span>
           </Link>
-          <div className="flex justify-center mb-4">
-            <img src="/lovable-uploads/e4fa81a3-01f8-4f2a-a00c-b542ef98cd8a.png" alt="CodeWave Logo" className="h-16" />
-          </div>
-          <h2 className="mt-2 text-center text-3xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Welcome back</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link to="/signup" className="font-medium text-green-600 hover:text-green-500">
-              Create one here
-            </Link>
-          </p>
         </div>
-        <Card className="bg-white/80 backdrop-blur-md shadow-xl border-green-100">
-          <CardHeader>
-            <CardTitle className="text-green-800">Sign In</CardTitle>
-            <CardDescription>
-              Enter your credentials to access your account
+
+        <Card className="shadow-lg">
+          <CardHeader className="space-y-1 text-center pb-4">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">Welcome Back</CardTitle>
+            <CardDescription className="text-base">
+              Sign in to your account to continue earning
             </CardDescription>
           </CardHeader>
+          
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email Address
+                </Label>
                 <Input
                   id="email"
                   type="email"
+                  placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="border-green-200 focus:border-green-500"
+                  className="h-11"
                 />
               </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="border-green-200 focus:border-green-500 pr-10"
+                    className="h-11 pr-10"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-11 px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Demo Account Buttons */}
+              <div className="pt-2 space-y-2">
+                <p className="text-xs text-gray-600 text-center">Try our demo accounts:</p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => fillDemoAccount(1)}
+                  >
+                    Demo 1
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => fillDemoAccount(2)}
+                  >
+                    Demo 2
+                  </Button>
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
+
+            <CardFooter className="flex flex-col space-y-4">
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                className="w-full h-11 bg-green-600 hover:bg-green-700 text-base font-medium" 
                 disabled={isLoading}
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {isLoading ? "Signing In..." : "Sign In"}
               </Button>
+              
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{" "}
+                  <Link to="/signup" className="text-green-600 hover:text-green-700 font-medium">
+                    Sign up here
+                  </Link>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Admin?{" "}
+                  <Link to="/admin-auth" className="text-blue-600 hover:text-blue-700">
+                    Admin Login
+                  </Link>
+                </p>
+              </div>
             </CardFooter>
           </form>
         </Card>
