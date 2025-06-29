@@ -1,330 +1,278 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { 
-  User, 
-  Wallet, 
-  TrendingUp, 
-  Clock, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  CheckCircle,
-  Menu,
-  X,
-  LogOut,
-  Download
-} from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { DollarSign, Users, TrendingUp, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
+    if (loading) return;
+    
     if (!user) {
-      navigate("/login");
+      navigate('/login');
       return;
     }
 
-    const fetchUserData = async () => {
-      try {
-        // Get user profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+    fetchProfile();
+  }, [user, loading, navigate]);
 
-        if (profileData) {
-          setUserProfile(profileData);
-        }
-
-        // Get recent transactions
-        const { data: transactionsData } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (transactionsData) {
-          setRecentTransactions(transactionsData);
-        }
-      } catch (error: any) {
-        console.error("Error fetching user data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load dashboard data",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [user, navigate]);
-
-  const handleLogout = async () => {
+  const fetchProfile = async () => {
     try {
-      await signOut();
-      navigate("/");
+      setProfileLoading(true);
+      console.log('Fetching profile for user:', user?.id);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) {
+        console.error('Profile fetch error:', error);
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user?.id,
+              email: user?.email,
+              full_name: user?.user_metadata?.full_name || 'New User',
+              balance: 0,
+              total_earned: 0,
+              registration_fee_paid: false
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Profile creation error:', createError);
+            toast({
+              title: "Error",
+              description: "Failed to create user profile",
+              variant: "destructive",
+            });
+          } else {
+            setProfile(newProfile);
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load profile",
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.log('Profile loaded:', data);
+        setProfile(data);
+      }
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Unexpected error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setProfileLoading(false);
     }
   };
 
-  if (isLoading) {
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  if (loading || profileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700">Loading dashboard...</h2>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Profile Not Found</CardTitle>
+            <CardDescription className="text-center">
+              We couldn't load your profile. Please try refreshing the page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <Button onClick={fetchProfile} className="w-full">
+              Retry
+            </Button>
+            <Button onClick={handleSignOut} variant="outline" className="w-full">
+              Sign Out
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="bg-white shadow-sm border-b lg:hidden">
-        <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          <div className="flex items-center gap-3">
-            {userProfile && (
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                ₦{(userProfile.balance || 0).toLocaleString()}
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="border-t bg-white p-4 space-y-2">
-            <Link to="/tasks" className="block">
-              <Button variant="ghost" className="w-full justify-start">
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Tasks & Rewards
-              </Button>
-            </Link>
-            <Link to="/profile" className="block">
-              <Button variant="ghost" className="w-full justify-start">
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </Button>
-            </Link>
-            <Link to="/withdrawal" className="block">
-              <Button variant="ghost" className="w-full justify-start">
-                <Wallet className="mr-2 h-4 w-4" />
-                Withdraw
-              </Button>
-            </Link>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-red-600 hover:text-red-700"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Desktop Header */}
-      <div className="hidden lg:block bg-white shadow-sm">
+      {/* Header */}
+      <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <div className="flex items-center space-x-4">
-              {userProfile && (
-                <>
-                  <span className="text-sm text-gray-600">Welcome, {userProfile.full_name}</span>
-                  <Badge className="bg-green-100 text-green-800">
-                    ₦{(userProfile.balance || 0).toLocaleString()}
-                  </Badge>
-                </>
-              )}
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Welcome back, {profile.full_name || 'User'}!
+              </h1>
+              <p className="text-gray-600">Here's your earning overview</p>
+            </div>
+            <div className="flex space-x-4">
+              <Link to="/profile">
+                <Button variant="outline">Profile</Button>
+              </Link>
+              <Button onClick={handleSignOut} variant="outline">
+                Sign Out
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Balance Card */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between">
-              <div className="text-center sm:text-left mb-4 sm:mb-0">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Balance</h2>
-                <p className="text-3xl font-bold text-green-600">
-                  ₦{(userProfile.balance || 0).toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Total Earned: ₦{(userProfile.total_earned || 0).toLocaleString()}
-                </p>
+      {/* Registration Fee Status */}
+      {!profile.registration_fee_paid && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <Card className="border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="text-orange-800">Complete Your Registration</CardTitle>
+              <CardDescription className="text-orange-700">
+                Pay your registration fee of ₦5000 to start earning. You'll receive a ₦2500 welcome bonus!
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/deposit">
+                <Button className="bg-orange-600 hover:bg-orange-700">
+                  Pay Registration Fee
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₦{Number(profile.balance || 0).toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Available for withdrawal</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₦{Number(profile.total_earned || 0).toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Lifetime earnings</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Registration Status</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {profile.registration_fee_paid ? 'Active' : 'Pending'}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Link to="/deposit">
-                  <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Deposit Funds
-                  </Button>
+              <p className="text-xs text-muted-foreground">
+                {profile.registration_fee_paid ? 'Account verified' : 'Complete registration'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Link to="/tasks">
+                  <Button size="sm" className="w-full">View Tasks</Button>
                 </Link>
                 <Link to="/withdrawal">
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" />
-                    Withdraw
-                  </Button>
+                  <Button size="sm" variant="outline" className="w-full">Withdraw</Button>
                 </Link>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-          <Link to="/tasks">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-              <CardHeader className="pb-3">
-                <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 lg:h-8 lg:w-8 text-green-600 mr-3" />
-                  <div>
-                    <CardTitle className="text-base lg:text-lg">Complete Tasks</CardTitle>
-                    <CardDescription className="text-xs lg:text-sm">
-                      Earn money by completing simple tasks
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full bg-green-600 hover:bg-green-700 text-sm lg:text-base">
-                  Start Earning <ArrowUpRight className="ml-2 h-3 w-3 lg:h-4 lg:w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/withdrawal">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-              <CardHeader className="pb-3">
-                <div className="flex items-center">
-                  <ArrowDownLeft className="h-5 w-5 lg:h-8 lg:w-8 text-blue-600 mr-3" />
-                  <div>
-                    <CardTitle className="text-base lg:text-lg">Withdraw Funds</CardTitle>
-                    <CardDescription className="text-xs lg:text-sm">
-                      Cash out your earnings to your bank
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full text-sm lg:text-base">
-                  Withdraw Now
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/profile">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-              <CardHeader className="pb-3">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 lg:h-8 lg:w-8 text-purple-600 mr-3" />
-                  <div>
-                    <CardTitle className="text-base lg:text-lg">Profile Settings</CardTitle>
-                    <CardDescription className="text-xs lg:text-sm">
-                      Update your account information
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full text-sm lg:text-base">
-                  View Profile
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
+            </CardContent>
+          </Card>
         </div>
+      </div>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg lg:text-xl">Recent Activity</CardTitle>
-            <CardDescription className="text-sm lg:text-base">
-              Your latest earnings and activities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 lg:space-y-4">
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between py-2 lg:py-3 border-b last:border-b-0">
-                    <div className="flex items-center">
-                      <div className={`p-2 rounded-lg mr-3 ${
-                        transaction.type === 'task_reward' ? 'bg-green-100' : 
-                        transaction.type === 'withdrawal' ? 'bg-red-100' : 'bg-blue-100'
-                      }`}>
-                        {transaction.type === 'task_reward' ? (
-                          <ArrowUpRight className="h-3 w-3 lg:h-4 lg:w-4 text-green-600" />
-                        ) : transaction.type === 'withdrawal' ? (
-                          <ArrowDownLeft className="h-3 w-3 lg:h-4 lg:w-4 text-red-600" />
-                        ) : (
-                          <Wallet className="h-3 w-3 lg:h-4 lg:w-4 text-blue-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm lg:text-base font-medium text-gray-900">
-                          {transaction.description || transaction.type}
-                        </p>
-                        <p className="text-xs lg:text-sm text-gray-500">
-                          {new Date(transaction.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm lg:text-base font-semibold ${
-                        transaction.type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {transaction.type === 'withdrawal' ? '-' : '+'}₦{transaction.amount.toLocaleString()}
-                      </p>
-                      <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-                        {transaction.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm lg:text-base text-gray-500 text-center py-6 lg:py-8">
-                  No transactions yet. Complete some tasks to get started!
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Quick Links */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 pb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Complete Tasks</CardTitle>
+              <CardDescription>Earn money by completing simple tasks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/tasks">
+                <Button className="w-full">Start Earning</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Add Funds</CardTitle>
+              <CardDescription>Deposit money to increase your balance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/deposit">
+                <Button className="w-full" variant="outline">Deposit Now</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Withdraw Earnings</CardTitle>
+              <CardDescription>Cash out your earnings to your bank account</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/withdrawal">
+                <Button className="w-full" variant="outline">Withdraw</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
