@@ -77,6 +77,33 @@ export type Database = {
           },
         ]
       }
+      daily_task_completions: {
+        Row: {
+          completion_date: string
+          created_at: string
+          id: string
+          reward_amount: number
+          task_type: string
+          user_id: string
+        }
+        Insert: {
+          completion_date?: string
+          created_at?: string
+          id?: string
+          reward_amount: number
+          task_type: string
+          user_id: string
+        }
+        Update: {
+          completion_date?: string
+          created_at?: string
+          id?: string
+          reward_amount?: number
+          task_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount: number
@@ -218,6 +245,42 @@ export type Database = {
         }
         Relationships: []
       }
+      social_posts: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          platform: string
+          post_description: string | null
+          post_title: string
+          post_url: string
+          reward_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform: string
+          post_description?: string | null
+          post_title: string
+          post_url: string
+          reward_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform?: string
+          post_description?: string | null
+          post_title?: string
+          post_url?: string
+          reward_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           category: string
@@ -313,6 +376,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_social_interactions: {
+        Row: {
+          completed_at: string
+          id: string
+          interaction_type: string
+          post_id: string
+          reward_claimed: boolean
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          interaction_type: string
+          post_id: string
+          reward_claimed?: boolean
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          interaction_type?: string
+          post_id?: string
+          reward_claimed?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_social_interactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_tasks: {
         Row: {

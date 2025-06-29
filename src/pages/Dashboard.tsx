@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,8 @@ import {
   CheckCircle,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Download
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -172,67 +172,39 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
-          <Card className="p-3 lg:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Wallet className="h-4 w-4 lg:h-6 lg:w-6 text-green-600" />
-              </div>
-              <div className="ml-3 lg:ml-4">
-                <p className="text-xs lg:text-sm font-medium text-gray-600">Balance</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                  ₦{(userProfile?.balance || 0).toLocaleString()}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Balance Card */}
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between">
+              <div className="text-center sm:text-left mb-4 sm:mb-0">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Balance</h2>
+                <p className="text-3xl font-bold text-green-600">
+                  ₦{(userProfile.balance || 0).toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Total Earned: ₦{(userProfile.total_earned || 0).toLocaleString()}
                 </p>
               </div>
-            </div>
-          </Card>
-
-          <Card className="p-3 lg:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <TrendingUp className="h-4 w-4 lg:h-6 lg:w-6 text-blue-600" />
-              </div>
-              <div className="ml-3 lg:ml-4">
-                <p className="text-xs lg:text-sm font-medium text-gray-600">Total Earned</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                  ₦{(userProfile?.total_earned || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3 lg:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <CheckCircle className="h-4 w-4 lg:h-6 lg:w-6 text-yellow-600" />
-              </div>
-              <div className="ml-3 lg:ml-4">
-                <p className="text-xs lg:text-sm font-medium text-gray-600">Tasks Done</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900">
-                  {recentTransactions.filter(t => t.type === 'task_reward').length}
-                </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link to="/deposit">
+                  <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Deposit Funds
+                  </Button>
+                </Link>
+                <Link to="/withdrawal">
+                  <Button variant="outline" className="w-full sm:w-auto">
+                    <Download className="mr-2 h-4 w-4" />
+                    Withdraw
+                  </Button>
+                </Link>
               </div>
             </div>
-          </Card>
+          </CardContent>
+        </Card>
 
-          <Card className="p-3 lg:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Clock className="h-4 w-4 lg:h-6 lg:w-6 text-purple-600" />
-              </div>
-              <div className="ml-3 lg:ml-4">
-                <p className="text-xs lg:text-sm font-medium text-gray-600">Status</p>
-                <p className="text-sm lg:text-base font-semibold text-green-600">
-                  {userProfile?.registration_fee_paid ? 'Active' : 'Inactive'}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Action Cards */}
+        {/* Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
           <Link to="/tasks">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
@@ -298,10 +270,10 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        {/* Recent Transactions */}
+        {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg lg:text-xl">Recent Transactions</CardTitle>
+            <CardTitle className="text-lg lg:text-xl">Recent Activity</CardTitle>
             <CardDescription className="text-sm lg:text-base">
               Your latest earnings and activities
             </CardDescription>

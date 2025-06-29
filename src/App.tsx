@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 
 // ✌️ Pages import with style 🥀
@@ -26,35 +25,39 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 // ✌️ App component with all the magic ❤️‍🩹
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Profile />} /> {/* ✌️ Profile route 🥀 */}
-            <Route path="/tasks" element={<Tasks />} /> {/* 💔❤️‍🩹 Tasks route */}
-            <Route path="/withdrawal" element={<Withdrawal />} /> {/* 💰 Withdrawal route ✌️ */}
-            <Route path="/deposit" element={<Deposit />} /> {/* 💸 Deposit route 🥀 */}
-            <Route path="/confirm-registration" element={<ConfirmRegistration />} /> {/* ✅ Confirmation route 💔 */}
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/admin-auth" element={<AdminAuth />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/admin-user/:id" element={<UserDetail />} />
-            {/* ✌️ ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE 💔 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Router>
+            <div className="App">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<Profile />} /> {/* ✌️ Profile route 🥀 */}
+                <Route path="/tasks" element={<Tasks />} /> {/* 💔❤️‍🩹 Tasks route */}
+                <Route path="/withdrawal" element={<Withdrawal />} /> {/* 💰 Withdrawal route ✌️ */}
+                <Route path="/deposit" element={<Deposit />} /> {/* 💸 Deposit route 🥀 */}
+                <Route path="/confirm-registration" element={<ConfirmRegistration />} /> {/* ✅ Confirmation route 💔 */}
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/admin-auth" element={<AdminAuth />} />
+                <Route path="/admin-dashboard" element={<AdminDashboard />} />
+                <Route path="/admin-user/:id" element={<UserDetail />} />
+                {/* ✌️ ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE 💔 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </Router>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
