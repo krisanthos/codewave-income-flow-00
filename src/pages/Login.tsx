@@ -59,11 +59,6 @@ const Login = () => {
     }
   };
 
-  const fillDemoAccount = (demoNumber: 1 | 2) => {
-    setEmail(`demo${demoNumber}@codewave.com`);
-    setPassword("demo123password");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -126,31 +121,6 @@ const Login = () => {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Demo Account Buttons */}
-              <div className="pt-2 space-y-2">
-                <p className="text-xs text-gray-600 text-center">Try our demo accounts:</p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs"
-                    onClick={() => fillDemoAccount(1)}
-                  >
-                    Demo 1
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs"
-                    onClick={() => fillDemoAccount(2)}
-                  >
-                    Demo 2
                   </Button>
                 </div>
               </div>

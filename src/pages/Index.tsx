@@ -16,7 +16,7 @@ const Index = () => {
               <span className="block text-green-600">Tasks & Rewards</span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto px-4">
-              Complete simple tasks, watch ads, and earn real money. Join thousands of users already earning daily rewards.
+              Complete simple tasks, watch videos, follow social accounts, and earn real money. Join thousands of users already earning daily rewards.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4">
               <Link to="/signup">
@@ -70,7 +70,7 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-sm sm:text-base">
-                  Watch ads, follow social accounts, and more
+                  Watch videos, follow accounts, and complete surveys
                 </CardDescription>
               </CardContent>
             </Card>
@@ -101,46 +101,6 @@ const Index = () => {
                   Cash out to your bank account anytime
                 </CardDescription>
               </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Demo Accounts Section */}
-      <div className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
-            Try Our Demo Accounts
-          </h2>
-          <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 px-4">
-            Test the platform with pre-loaded demo accounts
-          </p>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-2xl mx-auto">
-            <Card className="p-4 sm:p-6">
-              <h3 className="font-semibold text-lg mb-2">Demo Account 1</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                <strong>Email:</strong> demo1@codewave.com<br />
-                <strong>Password:</strong> demo123password
-              </p>
-              <Link to="/login">
-                <Button variant="outline" className="w-full">
-                  Login as Demo 1
-                </Button>
-              </Link>
-            </Card>
-
-            <Card className="p-4 sm:p-6">
-              <h3 className="font-semibold text-lg mb-2">Demo Account 2</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                <strong>Email:</strong> demo2@codewave.com<br />
-                <strong>Password:</strong> demo123password
-              </p>
-              <Link to="/login">
-                <Button variant="outline" className="w-full">
-                  Login as Demo 2
-                </Button>
-              </Link>
             </Card>
           </div>
         </div>
