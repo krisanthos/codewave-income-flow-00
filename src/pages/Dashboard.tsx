@@ -35,7 +35,7 @@ const Dashboard = () => {
         .from('profiles')
         .select('*')
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Profile fetch error:', error);
